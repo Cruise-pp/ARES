@@ -1,0 +1,7 @@
+# 2026 SOLIX AI Hackathon - AI security track
+
+## Description
+Build a system that takes one outside change and finds everything it touches. A change can be a vulnerability on a tool version, a data column newly marked as personal data, or a new rule such as EU-only models. Starting from that change, follow the links in the seed graph. A tool leads to the agents that use it. Those agents lead to the workflows that run them. Those workflows lead to the obligations they serve and the outputs they send. Then act on the result: pause every high risk workflow, open an incident that names the cause, and tell each owner the next step in plain words. Handle at least two of the three kinds of change.
+
+## Expected Result
+At the demo the team fires a vulnerability notice for one tool version and the full affected list appears within seconds. It shows the agents that use the tool, the workflows that depend on them, and the customer replies and finance feeds at stake. The high risk workflows pause on their own, each with an incident that names the vulnerability, and every owner has a clear next step in a queue. Low risk workflows keep running with a warning. The organisers then fire a change nobody has seen, and the system handles it live. If the stretch goal is built, the team also shows what a new policy would stop before anyone adopts it, and that list matches what really happens when the policy is applied.

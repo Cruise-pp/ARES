@@ -1,0 +1,53 @@
+# OS
+.DS_Store
+.AppleDouble
+._*
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.next/
+.turbo/
+coverage/
+
+# Logs / temp
+*.log
+tmp/
+*.tmp
+
+# Local databases
+*.sqlite
+*.db
+
+# Claude Code local settings
+.claude/settings.local.json
