@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAsync, useGraph } from '../api/hooks'
+import { motionReduced } from '../lib/motion'
 import type { Incident, TaskWithIncident } from '../api/types'
 import { Freshness } from '../components/Shell'
 import { ownerName, plural } from '../lib/format'
@@ -46,6 +47,7 @@ export function IncidentScreen() {
   const [items, setItems] = useState<TaskWithIncident[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [fixing, setFixing] = useState(false)
+  const [closing, setClosing] = useState(false)
   const [tick, setTick] = useState(0)
 
   useEffect(() => {
@@ -89,12 +91,16 @@ export function IncidentScreen() {
     setFixing(true)
     try {
       await api.setToolVersion(start.id, fix)
+      // Let each open step visibly close before the list redraws empty.
+      setClosing(true)
+      await new Promise((r) => setTimeout(r, motionReduced() ? 0 : 520 + 90 * (items?.length ?? 0)))
       refresh()
       setTick((n) => n + 1)
     } catch (e) {
       setError((e as Error).message)
     } finally {
       setFixing(false)
+      setClosing(false)
     }
   }
 
@@ -170,10 +176,13 @@ export function IncidentScreen() {
           </div>
 
           {queue.length === 0 && (
-            <div className="queue-empty">The queue is empty. Every owner step is done.</div>
+            <div className="queue-empty">
+              <span className="check">✓</span>
+              The queue is empty. Every owner step is done.
+            </div>
           )}
 
-          {queue.map((i) => {
+          {queue.map((i, idx) => {
             const warned = verdictOf.get(i.task.workflow_id)?.action === 'warned'
             const state = i.task.state === 'accepted' ? 'accepted' : warned ? 'warned' : 'open'
             return (
@@ -181,13 +190,14 @@ export function IncidentScreen() {
                 key={i.task.id}
                 role="button"
                 tabIndex={0}
-                className={`queue-row ${state} ${i === selected ? 'on' : ''}`}
+                className={`queue-row ${state} ${i === selected ? 'on' : ''} ${closing ? 'closing' : ''}`}
+                style={closing ? { animationDelay: `${idx * 90}ms` } : undefined}
                 onClick={() => i.incident && setParams({ task: i.task.id }, { replace: true })}
               >
                 <div className="top">
                   <span className="owner">{ownerName(i.task.owner_id)}</span>
                   <span className={`badge ${state === 'open' ? 'open' : state}`} style={{ minWidth: 64 }}>
-                    {state.toUpperCase()}
+                    {closing ? '✓ DONE' : state.toUpperCase()}
                   </span>
                 </div>
                 <div className="wf">{wfName(i.task.workflow_id)}</div>

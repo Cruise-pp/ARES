@@ -104,6 +104,9 @@ export function normalizeTask(raw: LooseTask): TaskWithIncident {
 
 // ---------------------------------------------------------------- endpoints
 
+/** Runs seen this session, so the next screen can paint at once instead of showing a loading frame. */
+export const runCache = new Map<string, Run>()
+
 export const api = {
   async getGraph(): Promise<Graph> {
     if (API_MODE === 'mock') return normalizeGraph(await mock((m) => m.mockServer.getGraph()))
@@ -115,9 +118,11 @@ export const api = {
     return http('POST', '/changes/parse', { text })
   },
 
-  postChange(change: ChangeEvent, mode: RunMode): Promise<Run> {
-    if (API_MODE === 'mock') return mock((m) => m.mockServer.postChange(change, mode))
-    return http('POST', '/changes', { change, mode })
+  async postChange(change: ChangeEvent, mode: RunMode): Promise<Run> {
+    const run: Run =
+      API_MODE === 'mock' ? await mock((m) => m.mockServer.postChange(change, mode)) : await http('POST', '/changes', { change, mode })
+    runCache.set(run.run_id, run)
+    return run
   },
 
   getChanges(): Promise<FeedRow[]> {
@@ -125,9 +130,10 @@ export const api = {
     return http('GET', '/changes')
   },
 
-  getRun(id: string): Promise<Run> {
-    if (API_MODE === 'mock') return mock((m) => m.mockServer.getRun(id))
-    return http('GET', `/runs/${encodeURIComponent(id)}`)
+  async getRun(id: string): Promise<Run> {
+    const run: Run = API_MODE === 'mock' ? await mock((m) => m.mockServer.getRun(id)) : await http('GET', `/runs/${encodeURIComponent(id)}`)
+    runCache.set(run.run_id, run)
+    return run
   },
 
   resumeWorkflow(id: string, reason: string): Promise<Verdict> {

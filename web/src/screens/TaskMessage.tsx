@@ -127,9 +127,15 @@ export function TaskMessage() {
             <div className="msg-done">Done. Radius saw the fix and closed this step.</div>
           ) : (
             <div className="msg-actions">
-              <button className="btn primary" onClick={accept} disabled={busy || task.state === 'accepted'}>
-                {task.state === 'accepted' ? 'You will do this' : 'I will do this'}
-              </button>
+              {task.state === 'accepted' ? (
+                <span className="btn accepted-pill" role="status">
+                  <span className="check">✓</span> You will do this
+                </span>
+              ) : (
+                <button className="btn primary" onClick={accept} disabled={busy}>
+                  {busy ? 'Saving…' : 'I will do this'}
+                </button>
+              )}
               {incident && (
                 <button className="btn" onClick={() => setShowPath((s) => !s)}>
                   {showPath ? 'Hide the path' : 'Show the path'}
@@ -144,8 +150,8 @@ export function TaskMessage() {
             </div>
           )}
           {task.state === 'accepted' && (
-            <div className="msg-done" style={{ color: 'var(--blue)' }}>
-              Radius will see the new version and close this step.
+            <div className="msg-done accepted-note">
+              Thanks. Radius will see the new version and close this step on its own.
             </div>
           )}
         </div>

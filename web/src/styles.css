@@ -1157,8 +1157,11 @@ a {
 }
 
 @keyframes shockwave {
-  from {
+  0% {
     transform: scale(0.0611);
+    opacity: 0;
+  }
+  3% {
     opacity: 0.9;
   }
   to {
@@ -2485,4 +2488,753 @@ svg.anim .pill-start {
 
 .br.drill {
   grid-template-columns: minmax(0, 1fr) 340px;
+}
+
+/* ============================================================ motion vocabulary
+   One set of curves and durations for every transition (mirrors EASE and DUR in lib/motion.ts). */
+:root {
+  --ease-out: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --ease-std: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-inout: cubic-bezier(0.7, 0, 0.25, 1);
+  --ease-pop: cubic-bezier(0.2, 1.5, 0.4, 1);
+  --dur-quick: 160ms;
+  --dur-base: 260ms;
+  --dur-scene: 440ms;
+}
+
+/* ------------------------------------------------------------ the hand-off */
+
+.handoff-curtain {
+  position: fixed;
+  width: 3400px;
+  height: 3400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #4a0f1c 0, #1f0b11 6%, #0a0b0e 18%);
+  transform: translate(-50%, -50%) scale(0);
+  z-index: 1000;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.handoff-orb {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 38%, #fff 0, #ffb3c0 22%, #ff375f 55%, #c8102e 100%);
+  box-shadow:
+    0 0 18px 6px rgba(255, 55, 95, 0.75),
+    0 0 70px 26px rgba(255, 55, 95, 0.35);
+  z-index: 1001;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.handoff-orb.trail {
+  width: 18px;
+  height: 18px;
+  background: #ff375f;
+  box-shadow: 0 0 16px 6px rgba(255, 55, 95, 0.5);
+}
+
+.home.leaving .home-col {
+  animation: home-leave 560ms var(--ease-std) forwards;
+}
+
+.home.leaving .home-card .btn.primary {
+  animation: fire-charge 380ms var(--ease-out) both;
+}
+
+@keyframes fire-charge {
+  40% {
+    transform: scale(0.92);
+    box-shadow: 0 0 0 10px rgba(224, 38, 63, 0.18), 0 0 30px rgba(224, 38, 63, 0.6);
+    background: var(--red);
+  }
+  100% {
+    transform: scale(1);
+    background: var(--red);
+  }
+}
+
+/* ------------------------------------------------------------ the reveal */
+
+svg.waiting *,
+svg.waiting {
+  animation-play-state: paused !important;
+}
+
+.camera {
+  transform-origin: 320px 320px;
+}
+
+.anim .camera {
+  animation:
+    camera-in 1900ms var(--ease-out) both,
+    camera-kick 340ms var(--ease-out);
+}
+
+@keyframes camera-in {
+  from {
+    transform: scale(1.1);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes camera-kick {
+  0% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.022) translate(1.5px, -1px);
+  }
+  55% {
+    transform: scale(0.995) translate(-1px, 0.5px);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.flare,
+.burst,
+.spark,
+.slam-ring,
+.stamp,
+.root-core,
+.root-halo {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.flare {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.anim .flare {
+  animation: flare 760ms var(--ease-out) both;
+}
+
+@keyframes flare {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  28% {
+    transform: scale(1.35);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+.shockwave.bloom {
+  stroke-width: 9;
+}
+
+.anim .shockwave.late {
+  stroke-width: 1;
+  animation: shockwave 1400ms var(--ease-out) 220ms both;
+}
+
+.impact {
+  pointer-events: none;
+}
+
+.comet {
+  fill: none;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-dasharray: 0.16 1.3;
+  stroke-dashoffset: 0.16;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.anim .comet {
+  animation: comet 600ms var(--ease-std) both;
+}
+
+@keyframes comet {
+  0% {
+    stroke-dashoffset: 0.16;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: -1;
+    opacity: 0;
+  }
+}
+
+.ignite {
+  pointer-events: none;
+}
+
+.burst {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  opacity: 0;
+  animation: burst 620ms var(--ease-out) both;
+}
+
+@keyframes burst {
+  0% {
+    transform: scale(1);
+    opacity: 0;
+  }
+  4% {
+    transform: scale(1.1);
+    opacity: 0.95;
+  }
+  to {
+    transform: scale(3.6);
+    opacity: 0;
+  }
+}
+
+.spark {
+  fill: currentColor;
+  opacity: 0;
+  animation: spark 560ms var(--ease-out) both;
+}
+
+@keyframes spark {
+  0% {
+    transform: translate(0, 0) scale(1.2);
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--dx), var(--dy)) scale(0.2);
+    opacity: 0;
+  }
+}
+
+.anim .node.pop.slam {
+  animation:
+    node-pop 420ms var(--ease-pop) both,
+    slam 340ms cubic-bezier(0.3, 0, 0.2, 1) forwards;
+}
+
+@keyframes slam {
+  0% {
+    transform: scale(2.3);
+  }
+  60% {
+    transform: scale(0.86);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.slam-ring {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  opacity: 0;
+  pointer-events: none;
+  animation: slam-ring 900ms var(--ease-out) both;
+}
+
+@keyframes slam-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0;
+  }
+  4% {
+    opacity: 0.95;
+  }
+  to {
+    transform: scale(6);
+    opacity: 0;
+  }
+}
+
+.stamp {
+  opacity: 0;
+  pointer-events: none;
+  animation: stamp 2000ms var(--ease-out) both;
+}
+
+.stamp rect {
+  fill: rgba(255, 55, 95, 0.16);
+  stroke: var(--red);
+  stroke-width: 1.5;
+}
+
+.stamp text {
+  fill: var(--red);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+@keyframes stamp {
+  0% {
+    transform: scale(2.2) rotate(-16deg);
+    opacity: 0;
+  }
+  9% {
+    transform: scale(0.94) rotate(-8deg);
+    opacity: 1;
+  }
+  14% {
+    transform: scale(1) rotate(-8deg);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(1) rotate(-8deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(-8deg) translateY(-4px);
+    opacity: 0;
+  }
+}
+
+.anim .root-pop {
+  animation: root-pop 640ms var(--ease-pop) both;
+}
+
+@keyframes root-pop {
+  0% {
+    transform: scale(0.3);
+  }
+  55% {
+    transform: scale(1.4);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.ghosts.late {
+  animation: ghosts-in 900ms ease both;
+}
+
+@keyframes ghosts-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.radar {
+  transform-origin: 320px 320px;
+  pointer-events: none;
+  animation:
+    ghosts-in 1400ms ease both,
+    radar 10s linear infinite;
+}
+
+@keyframes radar {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+.ambient .root-halo {
+  animation: halo-breathe 3.4s ease-in-out infinite;
+}
+
+@keyframes halo-breathe {
+  50% {
+    transform: scale(1.5);
+    opacity: 0.07;
+  }
+}
+
+.reduce-motion .radar,
+.reduce-motion .comets,
+.reduce-motion .ignite {
+  display: none;
+}
+
+/* stage overlays: the vignette pulse and the ticking readout */
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 50%, transparent 38%, rgba(255, 55, 95, 0.34) 100%);
+  opacity: 0;
+  z-index: 1;
+}
+
+.vignette.impact-pulse {
+  animation: vignette 1200ms var(--ease-out) both;
+}
+
+.vignette.act-pulse {
+  animation: vignette 1000ms var(--ease-out) both;
+}
+
+@keyframes vignette {
+  0% {
+    opacity: 0;
+  }
+  14% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.tracer {
+  position: absolute;
+  left: 50%;
+  bottom: 58px;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  animation: fade-in 300ms ease 400ms both;
+  z-index: 2;
+}
+
+.tracer .t {
+  font-size: 42px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-shadow: 0 0 24px rgba(255, 55, 95, 0.45);
+}
+
+.tracer .l {
+  margin-top: 6px;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tracer.done {
+  animation: tracer-out 700ms var(--ease-std) both;
+}
+
+@keyframes tracer-out {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px) scale(0.92);
+  }
+}
+
+.counters .n {
+  transition: opacity var(--dur-scene) var(--ease-std);
+}
+
+.counters.waiting .n {
+  opacity: 0.22;
+}
+
+.counters.counting .n {
+  animation: count-glow 1300ms var(--ease-out) both;
+}
+
+@keyframes count-glow {
+  0% {
+    text-shadow: 0 0 0 transparent;
+    transform: translateY(4px);
+  }
+  20% {
+    text-shadow: 0 0 22px currentColor;
+    transform: none;
+  }
+  100% {
+    text-shadow: 0 0 0 transparent;
+    transform: none;
+  }
+}
+
+.br-side .row-in {
+  animation: row-in-side 420ms var(--ease-out) both;
+}
+
+@keyframes row-in-side {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.paused-pill {
+  animation: pill-land 420ms var(--ease-pop) both;
+  z-index: 2;
+}
+
+@keyframes pill-land {
+  from {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.confirm {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--green-soft);
+  font-size: 13px;
+  animation: confirm-in 460ms var(--ease-pop) both;
+}
+
+.confirm .check {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--green);
+  color: #fff;
+  font-weight: 800;
+  animation: check-pop 520ms var(--ease-pop) 120ms both;
+}
+
+@keyframes confirm-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes check-pop {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+svg.waiting .impact,
+svg.waiting .ignite,
+svg.waiting .breathe,
+svg.waiting .comets,
+svg.waiting .root {
+  visibility: hidden;
+}
+
+/* ------------------------------------------------------------ state changes, one vocabulary */
+
+.readcard .chips .chip,
+.readcard .candidate,
+.readcard .readback,
+.readcard .actions {
+  animation: chip-in var(--dur-base) var(--ease-out) both;
+}
+
+.readcard .chips .chip:nth-child(1) { animation-delay: 60ms; }
+.readcard .chips .chip:nth-child(2) { animation-delay: 100ms; }
+.readcard .chips .chip:nth-child(3) { animation-delay: 140ms; }
+.readcard .chips .chip:nth-child(4) { animation-delay: 180ms; }
+.readcard .chips .chip:nth-child(5) { animation-delay: 220ms; }
+.readcard .candidate:nth-of-type(1) { animation-delay: 90ms; }
+.readcard .candidate:nth-of-type(2) { animation-delay: 150ms; }
+.readcard .candidate:nth-of-type(3) { animation-delay: 210ms; }
+.readcard .readback { animation-delay: 200ms; }
+.readcard .actions { animation-delay: 260ms; }
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.readcard {
+  transition: border-color var(--dur-base) var(--ease-std), box-shadow var(--dur-base) var(--ease-std);
+}
+
+.readcard.exact {
+  box-shadow: 0 10px 34px rgba(10, 108, 240, 0.1);
+}
+
+.queue-row.closing {
+  animation: row-close 520ms var(--ease-inout) both;
+}
+
+.queue-row.closing .badge {
+  background: var(--green-soft);
+  color: var(--green);
+  border-color: var(--green);
+}
+
+@keyframes row-close {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(48px) scale(0.97);
+  }
+}
+
+.queue-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  animation: confirm-in 460ms var(--ease-pop) both;
+}
+
+.queue-empty .check,
+.accepted-pill .check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: var(--green);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  animation: check-pop 520ms var(--ease-pop) 120ms both;
+}
+
+.accepted-pill {
+  background: var(--green-soft) !important;
+  color: var(--green) !important;
+  border-color: transparent !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  animation: confirm-in 420ms var(--ease-pop) both;
+  cursor: default;
+}
+
+.accepted-note {
+  color: var(--green) !important;
+  animation: chip-in 360ms var(--ease-out) 160ms both;
+}
+
+.side-box.predict,
+.side-box.actual {
+  animation: card-in 380ms var(--ease-out) both;
+}
+
+.side-box .big,
+.side-box .names {
+  animation: chip-in 360ms var(--ease-out) both;
+}
+
+.side-box .big:nth-of-type(2) { animation-delay: 80ms; }
+.side-box .big:nth-of-type(3) { animation-delay: 160ms; }
+.side-box .names { animation-delay: 240ms; }
+
+.verdict-pill {
+  display: inline-block;
+  animation: verdict-land 520ms var(--ease-pop) 380ms both;
+}
+
+@keyframes verdict-land {
+  0% {
+    opacity: 0;
+    transform: scale(1.8) rotate(-4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.br-head .right .when {
+  transition: opacity var(--dur-scene) var(--ease-std);
+}
+
+.br-head .right .when.hidden {
+  opacity: 0;
+}
+
+.br.leaving {
+  pointer-events: none;
+}
+
+.app {
+  transition: background-color var(--dur-scene) var(--ease-std);
+}
+
+.edge,
+.node,
+.label,
+.pill-g,
+.flow-edge {
+  transition: opacity var(--dur-base) var(--ease-std);
+}
+
+.br-stage .overlay {
+  transition: opacity var(--dur-scene) var(--ease-std);
+}
+
+.br-stage .overlay.hush {
+  opacity: 0;
+}
+
+.side-flow {
+  display: contents;
+}
+
+.comet.halo {
+  stroke-width: 11;
+  stroke-opacity: 0.35;
+}
+
+.comet.core {
+  stroke: #fff;
+  stroke-width: 2.6;
+  stroke-dasharray: 0.09 1.3;
 }

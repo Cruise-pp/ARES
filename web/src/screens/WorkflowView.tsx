@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { api } from '../api/client'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { api, runCache } from '../api/client'
 import { useAsync, useGraph } from '../api/hooks'
 import type { Run } from '../api/types'
 import { flowActAt, WorkflowGraph, type FlowTone } from '../components/WorkflowGraph'
 import { ownerName, plural, splitTitle } from '../lib/format'
 import { workflowFlow } from '../lib/flow'
-import { setMotionPref, useMotionPref } from '../lib/motion'
+import { EASE, setMotionPref, useMotionPref, zoomAbout } from '../lib/motion'
 import { MAX_HOPS, pathSteps, workflowRows, type WorkflowStatus } from '../lib/reach'
 
 const STATUS_BADGE: Partial<Record<WorkflowStatus, { text: string; cls: string }>> = {
@@ -21,7 +21,7 @@ const STATUS_BADGE: Partial<Record<WorkflowStatus, { text: string; cls: string }
 export function WorkflowView() {
   const { runId, wfId = '' } = useParams()
   const { graph, error } = useGraph()
-  const runState = useAsync(() => (runId ? api.getRun(runId) : Promise.resolve(null)), [runId])
+  const runState = useAsync(() => (runId ? api.getRun(runId) : Promise.resolve(null)), [runId], runId ? (runCache.get(runId) ?? null) : null)
 
   if (error) return <main className="page"><div className="error-box">{error.message}</div></main>
   if (runState.error) return <main className="page"><div className="error-box">Radius has no run “{runId}”. {runState.error.message}</div></main>
@@ -43,6 +43,9 @@ function WorkflowScene({ run, wfId, graph }: { run: Run | null; wfId: string; gr
   const [play, setPlay] = useState(0)
   const [animate, setAnimate] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
+  const location = useLocation()
+  const stageRef = useRef<HTMLElement>(null)
+  const zoomIn = (location.state as { zoomIn?: { x: number; y: number } } | null)?.zoomIn
 
   const lit = useMemo(() => new Set(run?.reached.map((r) => r.id) ?? []), [run])
   const flow = useMemo(() => workflowFlow(wfId, graph, lit), [wfId, graph, lit])
@@ -64,6 +67,36 @@ function WorkflowScene({ run, wfId, graph }: { run: Run | null; wfId: string; gr
     const t = setTimeout(() => setAnimate(false), act + 900)
     return () => clearTimeout(t)
   }, [play, reduced, run, act, flow.beats])
+
+  const wfPoint = () => {
+    const r = stageRef.current?.querySelector(`[data-id="${wfId}"]`)?.getBoundingClientRect()
+    return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : { x: innerWidth / 2, y: innerHeight / 2 }
+  }
+
+  // Arrive as if the camera flew into the workflow node you tapped.
+  useLayoutEffect(() => {
+    const svg = stageRef.current?.querySelector('svg')
+    if (!zoomIn || !svg) return
+    const a = zoomAbout(svg, wfPoint(), [0.45, 0], [1, 1], 480, EASE.out)
+    const side = document.querySelector('.br.drill .br-side')
+    const b = side?.animate([{ opacity: 0, transform: 'translateX(24px)' }, { opacity: 1, transform: 'none' }], {
+      duration: 420,
+      delay: 160,
+      easing: EASE.out,
+      fill: 'backwards',
+    })
+    return () => {
+      a.cancel()
+      b?.cancel()
+    }
+  }, [])
+
+  const leave = (to: string, state?: unknown) => (e: React.MouseEvent) => {
+    e.preventDefault()
+    const svg = stageRef.current?.querySelector('svg')
+    if (!svg || reduced) return navigate(to, { state })
+    zoomAbout(svg, wfPoint(), [1, 1], [0.3, 0], 340, EASE.inOut).finished.then(() => navigate(to, { state }), () => undefined)
+  }
 
   const status = row?.status
   const wfTone: FlowTone = status === 'paused' || status === 'would_pause' ? 'red' : status === 'resumed' ? 'green' : 'amber'
@@ -102,7 +135,7 @@ function WorkflowScene({ run, wfId, graph }: { run: Run | null; wfId: string; gr
     <>
       <div className="br-head">
         {base ? (
-          <Link to={base} className="back">
+          <Link to={base} className="back" onClick={leave(base, { settled: true, zoomOut: wfId })}>
             ← {title || 'Blast radius'}
           </Link>
         ) : (
@@ -116,7 +149,7 @@ function WorkflowScene({ run, wfId, graph }: { run: Run | null; wfId: string; gr
       </div>
 
       <div className="br drill">
-        <section className="br-stage flow-stage">
+        <section className="br-stage flow-stage" ref={stageRef}>
           {skipped ? (
             <div className="motion-banner">
               Your system asks for less motion, so the reveal was skipped.
@@ -250,7 +283,7 @@ function WorkflowScene({ run, wfId, graph }: { run: Run | null; wfId: string; gr
             {others.length > 0 && (
               <div className="switcher">
                 {others.map((o) => (
-                  <button key={o.id} className={`chip-btn ${o.status}`} onClick={() => navigate(`${base}/workflows/${encodeURIComponent(o.id)}`)}>
+                  <button key={o.id} className={`chip-btn ${o.status}`} onClick={leave(`${base}/workflows/${encodeURIComponent(o.id)}`, { zoomIn: { x: 0, y: 0 } })}>
                     {o.name}
                   </button>
                 ))}

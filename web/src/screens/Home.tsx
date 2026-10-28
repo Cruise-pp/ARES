@@ -5,6 +5,7 @@ import { useGraph } from '../api/hooks'
 import type { ChangeEvent, ParsedChange, RunMode } from '../api/types'
 import { pinCandidate, ReadCard } from '../components/ReadCard'
 import { plural } from '../lib/format'
+import { abort, launch } from '../lib/handoff'
 import { unmatchedQueue } from '../lib/local'
 import { useReducedMotion } from '../lib/motion'
 
@@ -16,7 +17,6 @@ const SAMPLES = [
 ]
 
 const PARSE_DEBOUNCE_MS = 450
-const LEAVE_MS = 320
 
 export function Home() {
   const navigate = useNavigate()
@@ -92,15 +92,14 @@ export function Home() {
     if (!parsed || parsed.state !== 'exact') return
     setBusy(true)
     setError(null)
+    const button = document.querySelector<HTMLElement>(mode === 'live' ? '.home-card .btn.primary' : '.home-card .btn:not(.primary)')
+    const covered = !reduced && button ? launch(button.getBoundingClientRect()) : Promise.resolve()
+    if (!reduced) setLeaving(true)
     try {
-      const wait = reduced ? 0 : LEAVE_MS
-      const [run] = await Promise.all([
-        api.postChange(parsed.change, mode),
-        new Promise((r) => setTimeout(r, wait)).then(() => setLeaving(true)),
-      ])
-      if (wait) await new Promise((r) => setTimeout(r, LEAVE_MS))
+      const [run] = await Promise.all([api.postChange(parsed.change, mode), covered])
       navigate(`/runs/${encodeURIComponent(run.run_id)}`, { state: { fresh: true } })
     } catch (e) {
+      abort()
       setError((e as Error).message)
       setBusy(false)
       setLeaving(false)

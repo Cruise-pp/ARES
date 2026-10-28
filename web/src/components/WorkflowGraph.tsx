@@ -104,6 +104,7 @@ export function WorkflowGraph({ flow, tones, animate, breathing, selected, onSel
           <g
             key={n.id}
             transform={`translate(${n.x},${n.y})`}
+            data-id={n.id}
             className={`pill-g ${dim(n.id) ? 'dim' : ''} ${selected === n.id ? 'sel' : ''}`}
             onClick={(e) => {
               e.stopPropagation()

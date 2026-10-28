@@ -51,6 +51,38 @@ export function useReducedMotion(): boolean {
   return useMotionPref().reduced
 }
 
+/** One easing and timing vocabulary for every transition. CSS mirrors these as --ease-* and --dur-*. */
+export const EASE = {
+  out: 'cubic-bezier(.2,.7,.3,1)',
+  std: 'cubic-bezier(.4,0,.2,1)',
+  inOut: 'cubic-bezier(.7,0,.25,1)',
+  pop: 'cubic-bezier(.2,1.5,.4,1)',
+}
+export const DUR = { quick: 160, base: 260, scene: 440 }
+
+/**
+ * Scales `el` about a screen point. Used for the zoom into a workflow and back out.
+ * `from`/`to` are [scale, opacity]. Resolves when done; the caller cancels on unmount.
+ */
+export function zoomAbout(
+  el: Element,
+  point: { x: number; y: number },
+  from: [number, number],
+  to: [number, number],
+  duration: number = DUR.scene,
+  easing = EASE.out,
+): Animation {
+  const r = el.getBoundingClientRect()
+  const origin = `${point.x - r.left}px ${point.y - r.top}px`
+  return el.animate(
+    [
+      { transform: `scale(${from[0]})`, opacity: from[1], transformOrigin: origin },
+      { transform: `scale(${to[0]})`, opacity: to[1], transformOrigin: origin },
+    ],
+    { duration: motionReduced() ? 0 : duration, easing, fill: 'both' },
+  )
+}
+
 /** Page 25: counters ease out with 1-(1-t)^3 so the last digits settle instead of snapping. */
 export const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
 
@@ -61,8 +93,12 @@ export const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
 export function useCountUp(target: number, epoch: number | null, startMs: number, durationMs: number, animate: boolean) {
   const [value, setValue] = useState(animate ? 0 : target)
   useEffect(() => {
-    if (!animate || epoch === null) {
+    if (!animate) {
       setValue(target)
+      return
+    }
+    if (epoch === null) {
+      setValue(0)
       return
     }
     let raf = 0

@@ -10,10 +10,10 @@ export interface AsyncState<T> {
   setData: (d: T | null) => void
 }
 
-export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]): AsyncState<T> {
-  const [data, setData] = useState<T | null>(null)
+export function useAsync<T>(fn: () => Promise<T>, deps: unknown[], initial: T | null = null): AsyncState<T> {
+  const [data, setData] = useState<T | null>(initial)
   const [error, setError] = useState<Error | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(initial === null)
   const [tick, setTick] = useState(0)
   const fnRef = useRef(fn)
   fnRef.current = fn

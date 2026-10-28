@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { api } from '../api/client'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { api, runCache } from '../api/client'
 import { useAsync, useGraph } from '../api/hooks'
 import type { Run } from '../api/types'
 import { actAt, RadiusGraph, REVEAL, type NodeTone } from '../components/RadiusGraph'
 import { nodeLabel, plural, splitTitle } from '../lib/format'
 import { radialLayout } from '../lib/layout'
 import { resumeLog } from '../lib/local'
-import { setMotionPref, useCountUp, useMotionPref } from '../lib/motion'
+import { abort, inFlight, land } from '../lib/handoff'
+import { EASE, setMotionPref, useCountUp, useMotionPref, zoomAbout } from '../lib/motion'
 import { ACTION_HOPS, countVisible, MAX_HOPS, pathSteps, workflowRows, type WorkflowRow, type WorkflowStatus } from '../lib/reach'
 
 type Phase = 'rest' | 'firing' | 'rings' | 'acting' | 'settled'
@@ -15,8 +16,12 @@ type Phase = 'rest' | 'firing' | 'rings' | 'acting' | 'settled'
 export function useElapsedReadout(epoch: number | null, animate: boolean, elapsedMs: number) {
   const [ms, setMs] = useState(animate ? 0 : elapsedMs)
   useEffect(() => {
-    if (!animate || epoch === null) {
+    if (!animate) {
       setMs(elapsedMs)
+      return
+    }
+    if (epoch === null) {
+      setMs(0)
       return
     }
     const window = Math.min(elapsedMs, REVEAL.readoutEnd - REVEAL.readoutStart)
@@ -49,8 +54,10 @@ export function BlastRadius() {
   const { runId = '' } = useParams()
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const entry = (location.state ?? {}) as { settled?: boolean; zoomOut?: string }
   const { graph, nodes, refresh } = useGraph()
-  const runState = useAsync(() => api.getRun(runId), [runId])
+  const runState = useAsync(() => api.getRun(runId), [runId], runCache.get(runId) ?? null)
   const run = runState.data
 
   useEffect(() => {
@@ -58,6 +65,7 @@ export function BlastRadius() {
   }, [runId, refresh])
 
   if (runState.error) {
+    abort()
     return (
       <main className="page">
         <div className="error-box">
@@ -78,7 +86,10 @@ export function BlastRadius() {
       run={run}
       focusParam={params.get('focus')}
       setFocusParam={(id) => setParams(id ? { focus: id } : {}, { replace: true })}
-      onDrill={(wfId) => navigate(`/runs/${encodeURIComponent(run.run_id)}/workflows/${encodeURIComponent(wfId)}`)}
+      entry={entry}
+      onDrill={(wfId, point) =>
+        navigate(`/runs/${encodeURIComponent(run.run_id)}/workflows/${encodeURIComponent(wfId)}`, { state: { zoomIn: point } })
+      }
       onFireLive={async () => {
         const live = await api.postChange(run.change, 'live')
         navigate(`/runs/${encodeURIComponent(live.run_id)}`)
@@ -99,12 +110,13 @@ interface ViewProps {
   graphNodes: ReturnType<typeof useGraph>['nodes']
   focusParam: string | null
   setFocusParam: (id: string | null) => void
-  onDrill: (workflowId: string) => void
+  entry: { settled?: boolean; zoomOut?: string }
+  onDrill: (workflowId: string, point: { x: number; y: number }) => void
   onFireLive: () => Promise<void>
   onResumed: () => void
 }
 
-function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, onDrill, onFireLive, onResumed }: ViewProps) {
+function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, entry, onDrill, onFireLive, onResumed }: ViewProps) {
   const { pref, reduced, systemReduced } = useMotionPref()
   const [limit, setLimit] = useState(ACTION_HOPS)
   const [play, setPlay] = useState(0)
@@ -114,6 +126,11 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [resumed, setResumed] = useState<{ n: number; reason: string } | null>(null)
+  const [leaving, setLeaving] = useState(false)
+  const skipEntry = useRef(!!entry.settled)
+  const stageRef = useRef<HTMLElement>(null)
+  const sideRef = useRef<HTMLElement>(null)
   const preview = run.mode === 'preview'
   const [title, subject] = splitTitle(run.change.title ?? run.run_id)
 
@@ -127,20 +144,71 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
   const act = actAt(maxRing)
 
   useEffect(() => {
-    if (reduced) {
+    if (reduced || skipEntry.current) {
+      abort()
       setEpoch(null)
       setPhase('settled')
       return
     }
-    setEpoch(performance.now())
-    setPhase('firing')
-    const timers = [
-      setTimeout(() => setPhase('rings'), REVEAL.ringStarts[0]),
-      setTimeout(() => setPhase('acting'), act),
-      setTimeout(() => setPhase('settled'), Math.max(REVEAL.readoutEnd, act + 1150)),
-    ]
-    return () => timers.forEach(clearTimeout)
+    let cancelled = false
+    const timers: number[] = []
+    const start = () => {
+      if (cancelled) return
+      setEpoch(performance.now())
+      setPhase('firing')
+      timers.push(
+        window.setTimeout(() => setPhase('rings'), REVEAL.ringStarts[0]),
+        window.setTimeout(() => setPhase('acting'), act),
+        window.setTimeout(() => setPhase('settled'), Math.max(REVEAL.readoutEnd, act + 2100)),
+      )
+    }
+    setEpoch(null)
+    setPhase('rest')
+    if (inFlight()) {
+      const core = stageRef.current?.querySelector('.root-core')?.getBoundingClientRect()
+      if (core) land(core.left + core.width / 2, core.top + core.height / 2).then(start)
+      else {
+        abort()
+        start()
+      }
+    } else timers.push(window.setTimeout(start, 60))
+    return () => {
+      cancelled = true
+      timers.forEach(clearTimeout)
+    }
   }, [run.run_id, play, reduced, act])
+
+  // Coming back out of a workflow: the stage zooms back from the node you left.
+  useLayoutEffect(() => {
+    const svg = stageRef.current?.querySelector('svg')
+    if (!entry.zoomOut || !svg) return
+    const n = layout.byId.get(entry.zoomOut)
+    if (!n) return
+    const r = svg.getBoundingClientRect()
+    const s = Math.min(r.width, r.height) / 640
+    const point = { x: r.left + r.width / 2 + (n.x - 320) * s, y: r.top + r.height / 2 + (n.y - 320) * s }
+    const a = zoomAbout(svg, point, [2.4, 0], [1, 1], 520, EASE.out)
+    return () => a.cancel()
+  }, [])
+
+  const replay = () => {
+    skipEntry.current = false
+    setPlay((p) => p + 1)
+  }
+
+  const drill = (wfId: string) => {
+    const svg = stageRef.current?.querySelector('svg')
+    const n = layout.byId.get(wfId)
+    if (!svg || !n || reduced) return onDrill(wfId, { x: 0, y: 0 })
+    const r = svg.getBoundingClientRect()
+    const s = Math.min(r.width, r.height) / 640
+    const point = { x: r.left + r.width / 2 + (n.x - 320) * s, y: r.top + r.height / 2 + (n.y - 320) * s }
+    setLeaving(true)
+    setFocusParam(wfId)
+    const a = zoomAbout(svg, point, [1, 1], [2.6, 0], 360, EASE.inOut)
+    sideRef.current?.animate([{ opacity: 1 }, { opacity: 0, transform: 'translateX(24px)' }], { duration: 300, easing: EASE.std, fill: 'forwards' })
+    a.finished.then(() => onDrill(wfId, point), () => undefined)
+  }
 
   const animate = !reduced && phase !== 'settled'
   const rows = workflowRows(run, graph, limit)
@@ -169,11 +237,12 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
   const elapsed = useElapsedReadout(epoch, animate, run.elapsed_ms)
   const cAgents = useCountUp(counts.agents, epoch, act, REVEAL.countersMs, animate)
   const cWorkflows = useCountUp(counts.workflows, epoch, act, REVEAL.countersMs, animate)
-  const pausedN = preview ? rows.filter((r) => r.status === 'would_pause').length : counts.paused
+  const pausedN = rows.filter((r) => r.status === (preview ? 'would_pause' : 'paused')).length
   const warnedN = preview ? rows.filter((r) => r.status === 'would_warn').length : counts.warned
   const cPaused = useCountUp(pausedN, epoch, act, REVEAL.countersMs, animate)
   const cWarned = useCountUp(warnedN, epoch, act, REVEAL.countersMs, animate)
   const acted = !animate || phase === 'acting'
+  const waiting = phase === 'rest' && animate
   const anyHigh = run.verdicts.some((v) => v.risk === 'high')
 
   const duties = reached.filter((r) => r.type === 'obligation' && r.hops <= Math.min(limit, ACTION_HOPS))
@@ -192,7 +261,7 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
         key={r.id}
         className={`wf-item ${r.status} ${focusParam === r.id ? 'on' : ''} ${a.className}`}
         style={a.style}
-        onClick={() => onDrill(r.id)}
+        onClick={() => drill(r.id)}
         onMouseEnter={() => setFocusParam(r.id)}
         onMouseLeave={() => setFocusParam(null)}
         title="Open this workflow"
@@ -211,10 +280,11 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
     setBusy(true)
     setError(null)
     try {
+      await Promise.all(pausedRows.map((r) => api.resumeWorkflow(r.id, reason.trim())))
       for (const r of pausedRows) {
-        await api.resumeWorkflow(r.id, reason.trim())
         resumeLog.add({ workflow_id: r.id, name: r.name, reason: reason.trim(), run_id: run.run_id, at: new Date().toISOString() })
       }
+      setResumed({ n: pausedRows.length, reason: reason.trim() })
       setResumeOpen(false)
       setReason('')
       onResumed()
@@ -241,12 +311,22 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
           <span className={`badge ${anyHigh ? 'high' : 'warned'}`}>{anyHigh ? 'HIGH' : 'LOW'}</span>
         )}
         <div className="right">
-          found in <strong>{(elapsed / 1000).toFixed(1)}s</strong>
+          <span className={`when${animate ? ' hidden' : ''}`}>
+            found in <strong>{(run.elapsed_ms / 1000).toFixed(1)}s</strong>
+          </span>
         </div>
       </div>
 
-      <div className="br">
-        <section className="br-stage">
+      <div className={`br${leaving ? ' leaving' : ''}`}>
+        <section className="br-stage" ref={stageRef}>
+          {animate && !waiting && <div className="vignette impact-pulse" />}
+          {animate && !waiting && acted && !preview && pausedN > 0 && <div className="vignette act-pulse" />}
+          {animate && !waiting && (
+            <div className={`tracer${acted ? ' done' : ''}`} style={acted ? { animationDelay: '500ms' } : undefined}>
+              <div className="t">{(elapsed / 1000).toFixed(1)}s</div>
+              <div className="l">{acted ? 'found' : 'tracing the graph'}</div>
+            </div>
+          )}
           {acted && pausedN > 0 && !preview && <div className="paused-pill">{pausedN} PAUSED</div>}
           {preview && <div className="paused-pill preview-pill">NOTHING PAUSES</div>}
 
@@ -257,7 +337,7 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
                 className="motion-play"
                 onClick={() => {
                   setMotionPref('on')
-                  setPlay((p) => p + 1)
+                  replay()
                 }}
               >
                 ▶ Play the reveal
@@ -265,7 +345,7 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
             </div>
           ) : (
             !animate && (
-              <button className="btn ghost small replay" onClick={() => setPlay((p) => p + 1)} title="Replay the reveal">
+              <button className="btn ghost small replay" onClick={() => replay()} title="Replay the reveal">
                 ↻ Replay
               </button>
             )
@@ -295,15 +375,17 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
             limit={limit}
             actionHops={ACTION_HOPS}
             animate={animate}
+            waiting={waiting}
+            ambient={!animate && !reduced}
             flashIds={flashIds}
             focus={focusSet}
             onSelect={(id) => {
-              if (id && graphNodes.get(id)?.type === 'workflow') onDrill(id)
+              if (id && graphNodes.get(id)?.type === 'workflow') drill(id)
               else setFocusParam(id)
             }}
           />
 
-          <div className="overlay">
+          <div className={`overlay${animate ? ' hush' : ''}`}>
             <label className="hop-control">
               Hops <strong>{limit}</strong>
               <input
@@ -319,8 +401,8 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
           </div>
         </section>
 
-        <aside className="br-side">
-          <div className="counters">
+        <aside className="br-side" ref={sideRef}>
+          <div className={`counters${animate && !acted ? ' waiting' : ''}${animate && acted ? ' counting' : ''}`}>
             <div className="counter">
               <div className="n">{cAgents}</div>
               <div className="l">Agents</div>
@@ -339,6 +421,7 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
             </div>
           </div>
 
+          <div className="side-flow" key={String(epoch)} style={waiting ? { visibility: 'hidden' } : undefined}>
           {rows.length === 0 && (
             <div className="muted" style={{ fontSize: 13 }}>
               {limit < 2 ? 'Move the hop limit up to see workflows.' : 'No workflow is reached. Nothing to pause. The check is recorded.'}
@@ -386,6 +469,14 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
               >
                 Fire it live
               </button>
+            ) : resumed && pausedRows.length === 0 ? (
+              <div className="confirm" role="status">
+                <span className="check">✓</span>
+                <div>
+                  <strong>{plural(resumed.n, 'workflow')} running again.</strong>
+                  <div className="muted">“{resumed.reason}” is in the record.</div>
+                </div>
+              </div>
             ) : resumeOpen ? (
               <form
                 className="resume-form"
@@ -420,6 +511,7 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
                 )}
               </div>
             )}
+          </div>
           </div>
         </aside>
       </div>
