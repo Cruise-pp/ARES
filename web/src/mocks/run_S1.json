@@ -1,0 +1,41 @@
+{
+  "run_id": "run_S1",
+  "mode": "live",
+  "elapsed_ms": 3800,
+  "change": {
+    "id": "chg_0142",
+    "kind": "faulty_tool",
+    "title": "CVE-2026-4471 · pdf-parse 2.1.4",
+    "target": "tool",
+    "where": {
+      "all": [
+        { "field": "name", "op": "eq", "value": "pdf-parse" },
+        { "field": "version", "op": "eq", "value": "2.1.4" }
+      ]
+    },
+    "effect": { "type": "fault", "ref": "CVE-2026-4471", "fix": "2.1.6" },
+    "mode": "live",
+    "source": { "lane": "feed", "raw": "CVE-2026-4471 · pdf-parse 2.1.4 · fixed in 2.1.6" },
+    "parse": { "by": "code", "confidence": 1, "receipt": "rcpt_88" }
+  },
+  "counts": { "agents": 3, "workflows": 3, "paused": 2, "warned": 1, "duties": 1, "outputs": 2, "untouched": 60 },
+  "reached": [
+    { "id": "tl_pdf_parse_214", "type": "tool", "name": "pdf-parse 2.1.4", "hops": 0, "path": ["tl_pdf_parse_214"], "via": [] },
+    { "id": "ag_claims_reader", "type": "agent", "name": "Claims reader", "hops": 1, "path": ["tl_pdf_parse_214", "ag_claims_reader"], "via": ["RUNS_ON"] },
+    { "id": "ag_contract_summariser", "type": "agent", "name": "Contract summariser", "hops": 1, "path": ["tl_pdf_parse_214", "ag_contract_summariser"], "via": ["RUNS_ON"] },
+    { "id": "ag_invoice_extractor", "type": "agent", "name": "Invoice extractor", "hops": 1, "path": ["tl_pdf_parse_214", "ag_invoice_extractor"], "via": ["RUNS_ON"] },
+    { "id": "wf_customer_reply", "type": "workflow", "name": "Customer reply", "hops": 2, "path": ["tl_pdf_parse_214", "ag_claims_reader", "wf_customer_reply"], "via": ["RUNS_ON", "INVOKES"] },
+    { "id": "wf_contract_review", "type": "workflow", "name": "Contract review", "hops": 2, "path": ["tl_pdf_parse_214", "ag_contract_summariser", "wf_contract_review"], "via": ["RUNS_ON", "INVOKES"] },
+    { "id": "wf_finance_feed", "type": "workflow", "name": "Finance feed", "hops": 2, "path": ["tl_pdf_parse_214", "ag_invoice_extractor", "wf_finance_feed"], "via": ["RUNS_ON", "INVOKES"] },
+    { "id": "out_customer_replies", "type": "output", "name": "1,204 replies", "hops": 3, "path": ["tl_pdf_parse_214", "ag_claims_reader", "wf_customer_reply", "out_customer_replies"], "via": ["RUNS_ON", "INVOKES", "SENDS"] },
+    { "id": "ob_sox_404", "type": "obligation", "name": "SOX 404", "hops": 3, "path": ["tl_pdf_parse_214", "ag_invoice_extractor", "wf_finance_feed", "ob_sox_404"], "via": ["RUNS_ON", "INVOKES", "SERVES"] },
+    { "id": "out_gl_posting", "type": "output", "name": "GL posting", "hops": 3, "path": ["tl_pdf_parse_214", "ag_invoice_extractor", "wf_finance_feed", "out_gl_posting"], "via": ["RUNS_ON", "INVOKES", "SENDS"] }
+  ],
+  "verdicts": [
+    { "workflow_id": "wf_customer_reply", "risk": "high", "action": "paused" },
+    { "workflow_id": "wf_finance_feed", "risk": "high", "action": "paused" },
+    { "workflow_id": "wf_contract_review", "risk": "low", "action": "warned" }
+  ],
+  "incidents": ["INC-2041", "INC-2042"],
+  "tasks": ["t_finance_feed", "t_customer_reply", "t_contract_review"]
+}
