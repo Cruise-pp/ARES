@@ -1,0 +1,3 @@
+{"kind": "faulty_tool", "target": "tool",
+ "where": {"all": [{"field": "vendor", "op": "eq", "value": "Acme"}]},
+ "effect": {"type": "fault", "ref": "ACME-2026-07"}}

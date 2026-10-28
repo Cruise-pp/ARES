@@ -1,0 +1,1 @@
+{"event": "classification.changed", "id": "DC-8812", "table": "customers", "column": "phone", "classification": "PII", "steward": "K. Osei", "changed_at": "2026-10-27T09:12:00Z"}

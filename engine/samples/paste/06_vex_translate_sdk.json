@@ -1,0 +1,10 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "vulnerabilities": [{
+    "id": "CVE-2026-5507",
+    "description": "translate-sdk sends request bodies to a debug endpoint when TRANSLATE_LOG is unset",
+    "recommendation": "Upgrade to translate-sdk 1.4.2.",
+    "affects": [{"ref": "pkg:pypi/translate-sdk@1.4.0"}]
+  }]
+}

@@ -1,0 +1,5 @@
+policy: POL-0034
+rule: EU models only
+target: agent
+model_region: not_in [EU]
+effect: rule

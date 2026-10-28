@@ -1,0 +1,7 @@
+{
+  "id": "GHSA-2c9f-pdfp-0001",
+  "aliases": ["CVE-2026-4471"],
+  "summary": "pdf-parse before 2.1.6 runs XFA scripts",
+  "affected": [{"package": {"ecosystem": "npm", "name": "pdf-parse"},
+                "ranges": [{"type": "SEMVER", "events": [{"introduced": "2.1.0"}, {"fixed": "2.1.6"}]}]}]
+}

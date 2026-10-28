@@ -1,0 +1,4 @@
+tool: pdf-parse
+version: 2.1.4
+cve: CVE-2026-4471
+fixed: 2.1.6

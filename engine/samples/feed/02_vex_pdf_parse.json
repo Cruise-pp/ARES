@@ -1,0 +1,17 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
+  "version": 1,
+  "metadata": {"timestamp": "2026-10-26T08:02:00Z", "supplier": {"name": "PDF Tools Ltd"}},
+  "components": [{"type": "library", "bom-ref": "pdf-parse@2.1.4", "name": "pdf-parse", "version": "2.1.4", "purl": "pkg:npm/pdf-parse@2.1.4"}],
+  "vulnerabilities": [{
+    "id": "CVE-2026-4471",
+    "source": {"name": "NVD", "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-4471"},
+    "ratings": [{"severity": "critical", "score": 9.8, "method": "CVSSv31"}],
+    "description": "Remote code execution in pdf-parse through a crafted XFA stream",
+    "recommendation": "Upgrade to 2.1.6 or later.",
+    "analysis": {"state": "exploitable", "response": ["update"]},
+    "affects": [{"ref": "pdf-parse@2.1.4", "versions": [{"version": "2.1.4", "status": "affected"}]}]
+  }]
+}

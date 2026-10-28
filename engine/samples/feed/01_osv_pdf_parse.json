@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.6.0",
+  "id": "GHSA-7x4r-9q2m-4471",
+  "modified": "2026-10-26T07:58:00Z",
+  "published": "2026-10-26T07:40:00Z",
+  "aliases": ["CVE-2026-4471"],
+  "summary": "Remote code execution in pdf-parse through a crafted XFA stream",
+  "details": "pdf-parse 2.1.4 and 2.1.5 evaluate XFA form scripts while extracting text. A crafted PDF runs code in the host process. Fixed in 2.1.6.",
+  "severity": [{"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}],
+  "affected": [{
+    "package": {"ecosystem": "npm", "name": "pdf-parse", "purl": "pkg:npm/pdf-parse"},
+    "ranges": [{"type": "SEMVER", "events": [{"introduced": "2.1.4"}, {"fixed": "2.1.6"}]}],
+    "versions": ["2.1.4", "2.1.5"]
+  }],
+  "references": [{"type": "ADVISORY", "url": "https://github.com/advisories/GHSA-7x4r-9q2m-4471"}]
+}
