@@ -7,9 +7,11 @@ import { actAt, RadiusGraph, REVEAL, type NodeTone } from '../components/RadiusG
 import { nodeLabel, plural, splitTitle } from '../lib/format'
 import { radialLayout } from '../lib/layout'
 import { resumeLog } from '../lib/local'
+import { storySentence } from '../lib/story'
+import { nextOf } from './TaskMessage'
 import { abort, inFlight, land } from '../lib/handoff'
-import { EASE, setMotionPref, useCountUp, useMotionPref, zoomAbout } from '../lib/motion'
-import { ACTION_HOPS, countVisible, MAX_HOPS, pathSteps, workflowRows, type WorkflowRow, type WorkflowStatus } from '../lib/reach'
+import { EASE, useCountUp, useMotionPref, zoomAbout } from '../lib/motion'
+import { ACTION_HOPS, countVisible, MAX_HOPS, pathSteps, workflowRows, type WorkflowRow } from '../lib/reach'
 
 type Phase = 'rest' | 'firing' | 'rings' | 'acting' | 'settled'
 
@@ -36,19 +38,6 @@ export function useElapsedReadout(epoch: number | null, animate: boolean, elapse
   }, [epoch, animate, elapsedMs])
   return ms
 }
-
-const GROUPS_LIVE: { status: WorkflowStatus; title: string; tone: string }[] = [
-  { status: 'paused', title: 'Paused', tone: 'red' },
-  { status: 'warned', title: 'Warned · still running', tone: 'amber' },
-  { status: 'resumed', title: 'Resumed by hand', tone: 'grey' },
-  { status: 'beyond', title: `Beyond ${ACTION_HOPS} hops · not acted on`, tone: 'grey' },
-]
-
-const GROUPS_PREVIEW: { status: WorkflowStatus; title: string; tone: string }[] = [
-  { status: 'would_pause', title: 'Would pause', tone: 'red' },
-  { status: 'would_warn', title: 'Would warn', tone: 'amber' },
-  { status: 'beyond', title: `Beyond ${ACTION_HOPS} hops · not acted on`, tone: 'grey' },
-]
 
 export function BlastRadius() {
   const { runId = '' } = useParams()
@@ -117,8 +106,8 @@ interface ViewProps {
 }
 
 function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, entry, onDrill, onFireLive, onResumed }: ViewProps) {
-  const { pref, reduced, systemReduced } = useMotionPref()
-  const [limit, setLimit] = useState(ACTION_HOPS)
+  const { reduced } = useMotionPref()
+  const limit = ACTION_HOPS
   const [play, setPlay] = useState(0)
   const [phase, setPhase] = useState<Phase>('rest')
   const [epoch, setEpoch] = useState<number | null>(null)
@@ -127,6 +116,7 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, en
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resumed, setResumed] = useState<{ n: number; reason: string } | null>(null)
+  const tasks = useAsync(() => Promise.all(run.tasks.map((t) => api.getTask(t))), [run.run_id, run.tasks.join()])
   const [leaving, setLeaving] = useState(false)
   const skipEntry = useRef(!!entry.settled)
   const stageRef = useRef<HTMLElement>(null)
@@ -243,34 +233,48 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, en
   const cWarned = useCountUp(warnedN, epoch, act, REVEAL.countersMs, animate)
   const acted = !animate || phase === 'acting'
   const waiting = phase === 'rest' && animate
-  const anyHigh = run.verdicts.some((v) => v.risk === 'high')
 
-  const duties = reached.filter((r) => r.type === 'obligation' && r.hops <= Math.min(limit, ACTION_HOPS))
   const pausedRows = rows.filter((r) => r.status === 'paused')
 
-  const groups = preview ? GROUPS_PREVIEW : GROUPS_LIVE
   const rowsStart = Math.max(REVEAL.rowsStart, act + 200)
-  let rowIndex = 0
   const rowIn = (i: number) =>
     animate ? { className: 'row-in', style: { animationDelay: `${rowsStart + i * REVEAL.rowStep}ms` } } : { className: '', style: undefined }
 
-  const renderRow = (r: WorkflowRow) => {
-    const a = rowIn(rowIndex++)
+  const dutiesOf = (wfId: string) =>
+    reached
+      .filter((r) => r.type === 'obligation' && r.path[r.path.length - 2] === wfId && r.hops <= ACTION_HOPS)
+      .map((r) => nodeLabel(graphNodes.get(r.id), r.name))
+  const stopRows = rows.filter((r) => r.status === (preview ? 'would_pause' : 'paused'))
+  const warnRows = rows.filter((r) => r.status === (preview ? 'would_warn' : 'warned'))
+  const backRows = rows.filter((r) => r.status === 'resumed')
+  const sentence = storySentence({
+    preview,
+    paused: stopRows.map((r) => ({ name: r.name, duties: dutiesOf(r.id) })),
+    warned: warnRows.map((r) => r.name),
+    resumed: backRows.map((r) => r.name),
+  })
+
+  const nextFor = (wfId: string) => {
+    const t = tasks.data?.find((x) => x.task.workflow_id === wfId)
+    return t ? nextOf(t) : ''
+  }
+
+  const row = (r: WorkflowRow, i: number, quiet = false) => {
+    const a = rowIn(i)
+    const next = nextFor(r.id)
     return (
       <button
         key={r.id}
-        className={`wf-item ${r.status} ${focusParam === r.id ? 'on' : ''} ${a.className}`}
+        className={`p-row ${quiet ? 'quiet' : r.status} ${focusParam === r.id ? 'on' : ''} ${a.className}`}
         style={a.style}
         onClick={() => drill(r.id)}
         onMouseEnter={() => setFocusParam(r.id)}
         onMouseLeave={() => setFocusParam(null)}
-        title="Open this workflow"
+        title={`${r.owner} · open this workflow`}
       >
-        <div className="name">
-          <span>{r.name}</span>
-          <span className="chev">›</span>
-        </div>
-        <div className="detail">{r.owner}</div>
+        <span className="p-name">{r.name}</span>
+        {next && <span className="p-next">{next}</span>}
+        <span className="chev">›</span>
       </button>
     )
   }
@@ -295,7 +299,6 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, en
     }
   }
 
-  const skipped = reduced && pref === 'system' && systemReduced
 
   return (
     <>
@@ -305,11 +308,7 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, en
         </Link>
         <span className="cid">{title}</span>
         {subject && <span className="subject">{subject}</span>}
-        {preview ? (
-          <span className="badge preview">PREVIEW · NOTHING PAUSES</span>
-        ) : (
-          <span className={`badge ${anyHigh ? 'high' : 'warned'}`}>{anyHigh ? 'HIGH' : 'LOW'}</span>
-        )}
+        {preview && <span className="subject">Preview · nothing pauses</span>}
         <div className="right">
           <span className={`when${animate ? ' hidden' : ''}`}>
             found in <strong>{(run.elapsed_ms / 1000).toFixed(1)}s</strong>
@@ -327,29 +326,12 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, en
               <div className="l">{acted ? 'found' : 'tracing the graph'}</div>
             </div>
           )}
-          {acted && pausedN > 0 && !preview && <div className="paused-pill">{pausedN} PAUSED</div>}
-          {preview && <div className="paused-pill preview-pill">NOTHING PAUSES</div>}
 
-          {skipped ? (
-            <div className="motion-banner">
-              Your system asks for less motion, so the reveal was skipped.
-              <button
-                className="motion-play"
-                onClick={() => {
-                  setMotionPref('on')
-                  replay()
-                }}
-              >
-                ▶ Play the reveal
-              </button>
-            </div>
-          ) : (
-            !animate && (
+          {!animate && (
               <button className="btn ghost small replay" onClick={() => replay()} title="Replay the reveal">
                 ↻ Replay
               </button>
-            )
-          )}
+            )}
 
           {focusItem && (
             <div className="path-strip" role="status">
@@ -359,9 +341,6 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, en
                   <span className="step">{s.label}</span>
                 </span>
               ))}
-              <span className="faint" style={{ marginLeft: 6 }}>
-                · {plural(focusItem.hops, 'hop')}
-              </span>
               <button className="close" onClick={() => setFocusParam(null)} aria-label="Close path">
                 ✕
               </button>
@@ -386,132 +365,113 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, en
           />
 
           <div className={`overlay${animate ? ' hush' : ''}`}>
-            <label className="hop-control">
-              Hops <strong>{limit}</strong>
-              <input
-                type="range"
-                min={1}
-                max={MAX_HOPS}
-                value={limit}
-                onChange={(e) => setLimit(Number(e.target.value))}
-                aria-label="Hop limit"
-              />
-            </label>
-            <span className="faint">Tap a workflow to open it</span>
+            <span className="faint">Tap a workflow to see inside it</span>
           </div>
         </section>
 
-        <aside className="br-side" ref={sideRef}>
-          <div className={`counters${animate && !acted ? ' waiting' : ''}${animate && acted ? ' counting' : ''}`}>
-            <div className="counter">
-              <div className="n">{cAgents}</div>
-              <div className="l">Agents</div>
-            </div>
-            <div className="counter">
-              <div className="n">{cWorkflows}</div>
-              <div className="l">Workflows</div>
-            </div>
-            <div className="counter red">
-              <div className="n">{cPaused}</div>
-              <div className="l">{preview ? 'Would pause' : 'Paused'}</div>
-            </div>
-            <div className="counter amber">
-              <div className="n">{cWarned}</div>
-              <div className="l">{preview ? 'Would warn' : 'Warned'}</div>
-            </div>
-          </div>
-
+        <aside className="br-side panel" ref={sideRef}>
           <div className="side-flow" key={String(epoch)} style={waiting ? { visibility: 'hidden' } : undefined}>
-          {rows.length === 0 && (
-            <div className="muted" style={{ fontSize: 13 }}>
-              {limit < 2 ? 'Move the hop limit up to see workflows.' : 'No workflow is reached. Nothing to pause. The check is recorded.'}
+            <p className={`p-sentence ${rowIn(0).className}`} style={rowIn(0).style}>
+              {sentence}
+            </p>
+
+            <div className={`p-numbers${animate && !acted ? ' waiting' : ''}${animate && acted ? ' counting' : ''}`}>
+              <div>
+                <b>{cAgents}</b>
+                <span>{counts.agents === 1 ? 'agent' : 'agents'}</span>
+              </div>
+              <div>
+                <b>{cWorkflows}</b>
+                <span>{counts.workflows === 1 ? 'workflow' : 'workflows'}</span>
+              </div>
+              <div className={pausedN ? 'red' : ''}>
+                <b>{cPaused}</b>
+                <span>{preview ? 'would pause' : 'paused'}</span>
+              </div>
+              <div>
+                <b>{cWarned}</b>
+                <span>{preview ? 'would warn' : 'warned'}</span>
+              </div>
             </div>
-          )}
 
-          {groups.map((g) => {
-            const list = rows
-              .filter((r) => r.status === g.status)
-              .sort((a, b) => (a.risk === b.risk ? a.name.localeCompare(b.name) : a.risk === 'high' ? -1 : 1))
-            if (!list.length) return null
-            const t = rowIn(rowIndex)
-            return (
-              <section key={g.status}>
-                <div className={`group-title ${g.tone} ${t.className}`} style={t.style}>
-                  {g.title}
-                </div>
-                {list.map(renderRow)}
-              </section>
-            )
-          })}
+            {stopRows.length > 0 && <div className="p-list">{stopRows.map((r, i) => row(r, i + 1))}</div>}
 
-          <div className={`side-foot ${rowIn(rows.length + 1).className}`} style={rowIn(rows.length + 1).style}>
-            {duties.length > 0 && (
-              <div className="duty-line">
-                At risk: <span style={{ color: 'var(--blue)' }}>{duties.map((d) => nodeLabel(graphNodes.get(d.id), d.name)).join(' · ')}</span>
+            {(warnRows.length > 0 || backRows.length > 0) && (
+              <div className="p-list">
+                {warnRows.length > 0 && (
+                  <div className={`p-caption ${rowIn(stopRows.length + 1).className}`} style={rowIn(stopRows.length + 1).style}>
+                    {preview ? 'Would keep running, with a warning' : 'Still running, with a warning'}
+                  </div>
+                )}
+                {warnRows.map((r, i) => row(r, stopRows.length + 2 + i, true))}
+                {backRows.map((r, i) => row(r, stopRows.length + warnRows.length + 2 + i, true))}
               </div>
             )}
 
-            {error && <div className="error-box">{error}</div>}
-
-            {preview ? (
-              <button
-                className="btn primary"
-                disabled={busy}
-                onClick={async () => {
-                  setBusy(true)
-                  try {
-                    await onFireLive()
-                  } catch (e) {
-                    setError((e as Error).message)
-                    setBusy(false)
-                  }
-                }}
-              >
-                Fire it live
-              </button>
-            ) : resumed && pausedRows.length === 0 ? (
-              <div className="confirm" role="status">
-                <span className="check">✓</span>
-                <div>
-                  <strong>{plural(resumed.n, 'workflow')} running again.</strong>
-                  <div className="muted">“{resumed.reason}” is in the record.</div>
+            <div className={`p-foot ${rowIn(rows.length + 3).className}`} style={rowIn(rows.length + 3).style}>
+              {error && <div className="error-box">{error}</div>}
+              {preview ? (
+                <button
+                  className="btn primary wide"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true)
+                    try {
+                      await onFireLive()
+                    } catch (e) {
+                      setError((e as Error).message)
+                      setBusy(false)
+                    }
+                  }}
+                >
+                  Fire it live
+                </button>
+              ) : resumed && pausedRows.length === 0 ? (
+                <div className="confirm" role="status">
+                  <span className="check">✓</span>
+                  <div>
+                    <strong>{plural(resumed.n, 'workflow')} running again.</strong>
+                    <div className="muted">“{resumed.reason}” is in the record.</div>
+                  </div>
                 </div>
-              </div>
-            ) : resumeOpen ? (
-              <form
-                className="resume-form"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  resumeAll()
-                }}
-              >
-                <input
-                  autoFocus
-                  placeholder="Why resume? This goes in the record."
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Escape' && setResumeOpen(false)}
-                />
-                <button className="btn" disabled={!reason.trim() || busy} type="submit">
-                  Resume {pausedRows.length}
-                </button>
-                <button className="btn ghost" type="button" onClick={() => setResumeOpen(false)}>
-                  Cancel
-                </button>
-              </form>
-            ) : (
-              <div className="quiet-links">
-                {run.tasks.length > 0 && (
-                  <Link to={`/runs/${encodeURIComponent(run.run_id)}/incident`}>Owners & next steps ({run.tasks.length}) →</Link>
-                )}
-                {pausedRows.length > 0 && (
-                  <button className="linkish" onClick={() => setResumeOpen(true)}>
-                    Resume…
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+              ) : (
+                <>
+                  {run.tasks.length > 0 && (
+                    <Link className="btn primary wide" to={`/runs/${encodeURIComponent(run.run_id)}/incident`}>
+                      Send next steps
+                    </Link>
+                  )}
+                  {pausedRows.length > 0 &&
+                    (resumeOpen ? (
+                      <form
+                        className="resume-form"
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          resumeAll()
+                        }}
+                      >
+                        <input
+                          autoFocus
+                          placeholder="Why is it safe to resume? This goes in the record."
+                          value={reason}
+                          onChange={(e) => setReason(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Escape' && setResumeOpen(false)}
+                        />
+                        <button className="linkish strong" disabled={!reason.trim() || busy} type="submit">
+                          Resume
+                        </button>
+                        <button className="linkish" type="button" onClick={() => setResumeOpen(false)}>
+                          Cancel
+                        </button>
+                      </form>
+                    ) : (
+                      <button className="linkish center" onClick={() => setResumeOpen(true)}>
+                        Resume instead…
+                      </button>
+                    ))}
+                </>
+              )}
+            </div>
           </div>
         </aside>
       </div>

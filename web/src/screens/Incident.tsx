@@ -4,7 +4,6 @@ import { api } from '../api/client'
 import { useAsync, useGraph } from '../api/hooks'
 import { motionReduced } from '../lib/motion'
 import type { Incident, TaskWithIncident } from '../api/types'
-import { Freshness } from '../components/Shell'
 import { ownerName, plural } from '../lib/format'
 import { nextOf } from './TaskMessage'
 
@@ -17,23 +16,25 @@ function openedAt(incident: Incident): string {
   return m ? m[1] : ''
 }
 
+const STATE_WORD: Record<string, string> = { open: 'Paused', warned: 'Warning', accepted: 'Accepted' }
+
 export function SevenLines({ incident }: { incident: Incident }) {
   return (
     <dl className="seven">
-      <dt>cause</dt>
-      <dd className="red">{incident.cause}</dd>
-      <dt>path</dt>
-      <dd>{pathText(incident.path).replace(/ → /g, ' → \n')}</dd>
-      <dt>risk</dt>
-      <dd className="red">{incident.risk}</dd>
-      <dt>duty</dt>
-      <dd className="blue">{incident.duty}</dd>
-      <dt>action</dt>
-      <dd>{incident.action}</dd>
-      <dt>owner</dt>
+      <dt>Cause</dt>
+      <dd>{incident.cause}</dd>
+      <dt>Path</dt>
+      <dd>{pathText(incident.path)}</dd>
+      <dt>Risk</dt>
+      <dd>{incident.risk.charAt(0).toUpperCase() + incident.risk.slice(1)}</dd>
+      <dt>Duty</dt>
+      <dd className="duty">{incident.duty}</dd>
+      <dt>Action</dt>
+      <dd>{incident.action.charAt(0).toUpperCase() + incident.action.slice(1)}</dd>
+      <dt>Owner</dt>
       <dd>{incident.owner}</dd>
-      <dt>next</dt>
-      <dd className="blue">{incident.next}</dd>
+      <dt>Next</dt>
+      <dd className="next">{incident.next.charAt(0).toUpperCase() + incident.next.slice(1)}</dd>
     </dl>
   )
 }
@@ -113,32 +114,31 @@ export function IncidentScreen() {
         {incident ? (
           <>
             <span className="cid">{incident.id}</span>
-            <span className={`badge ${closed ? 'ok' : 'contained'}`}>{closed ? 'RESOLVED' : 'CONTAINED'}</span>
+            <span className="state-word">{closed ? 'Resolved' : 'Contained'}</span>
           </>
         ) : (
           <span className="cid">{run.change.title}</span>
         )}
         <div className="right">
-          {incident && <div>opened {openedAt(incident)} · by Radius, not a person</div>}
-          <Freshness />
+          {incident && <div>Opened {openedAt(incident)} by Radius, not a person</div>}
         </div>
       </div>
 
       <div className="inc">
         <section className="inc-col">
-          <div className="eyebrow">The incident</div>
+          <div className="eyebrow">{incident ? `Why ${wfName(selected!.task.workflow_id)} stopped` : 'The incident'}</div>
           {incident ? (
             <>
               <SevenLines incident={incident} />
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 22, fontSize: 13 }}>
                 <Link
-                  className="btn"
+                  className="inline-link"
                   to={`/runs/${encodeURIComponent(run.run_id)}?focus=${encodeURIComponent(selected!.task.workflow_id)}`}
                 >
                   Open the path
                 </Link>
-                <Link className="btn ghost" to={`/task/${encodeURIComponent(selected!.task.id)}`}>
-                  Owner message ↗
+                <Link className="inline-link" to={`/task/${encodeURIComponent(selected!.task.id)}`}>
+                  Open the owner message
                 </Link>
               </div>
               {withIncident.length > 1 && (
@@ -167,13 +167,12 @@ export function IncidentScreen() {
           )}
         </section>
 
-        <section className="inc-col">
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
-            <span className="eyebrow">Owner queue</span>
-            <span className="faint" style={{ fontSize: 12 }}>
-              {queue.length} open · 0 overdue
-            </span>
-          </div>
+        <section className="inc-col queue">
+          <p className="p-sentence" style={{ marginBottom: 24 }}>
+            {queue.length
+              ? `${plural(queue.length, 'owner')} ${queue.length === 1 ? 'has' : 'have'} a next step.`
+              : 'Every owner step is done.'}
+          </p>
 
           {queue.length === 0 && (
             <div className="queue-empty">
@@ -197,13 +196,13 @@ export function IncidentScreen() {
                 <div className="top">
                   <span className="owner">{ownerName(i.task.owner_id)}</span>
                   <span className={`badge ${state === 'open' ? 'open' : state}`} style={{ minWidth: 64 }}>
-                    {closing ? '✓ DONE' : state.toUpperCase()}
+                    {closing ? '✓ Done' : STATE_WORD[state]}
                   </span>
                 </div>
                 <div className="wf">{wfName(i.task.workflow_id)}</div>
-                <div className="next">→ {nextOf(i)}</div>
+                <div className="next">{nextOf(i)}</div>
                 <Link to={`/task/${encodeURIComponent(i.task.id)}`} onClick={(e) => e.stopPropagation()}>
-                  message
+                  Open the message
                 </Link>
               </div>
             )

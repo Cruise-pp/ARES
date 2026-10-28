@@ -11,7 +11,8 @@ function systemReduced(): boolean {
 
 export function getMotionPref(): MotionPref {
   const v = typeof localStorage !== 'undefined' ? localStorage.getItem(KEY) : null
-  return v === 'on' || v === 'off' ? v : 'system'
+  // Unset means play: the reveal is the product, so it runs unless someone turns it off here.
+  return v === 'off' || v === 'system' ? v : 'on'
 }
 
 /** The reveal runs unless the person (or their system, when they have not chosen) asks for reduced motion. */
@@ -43,7 +44,7 @@ const subscribe = (l: () => void) => {
 }
 
 export function useMotionPref(): { pref: MotionPref; reduced: boolean; systemReduced: boolean } {
-  const pref = useSyncExternalStore(subscribe, getMotionPref, () => 'system' as MotionPref)
+  const pref = useSyncExternalStore(subscribe, getMotionPref, () => 'on' as MotionPref)
   return { pref, reduced: motionReduced(pref), systemReduced: systemReduced() }
 }
 

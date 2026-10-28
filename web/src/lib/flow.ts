@@ -173,11 +173,11 @@ export function workflowFlow(wfId: string, graph: Graph, lit: Set<string>): Flow
   ].map((e) => ({ ...e, id: `${e.from}>${e.to}`, lit: lit.has(e.from) && lit.has(e.to) }))
 
   const colLabel = (c: number) => {
-    if (c === 0) return 'TOOLS & DATA'
-    if (c <= D) return c === D ? 'SUB-AGENTS' : 'NESTED SUB-AGENTS'
-    if (c === D + 1) return 'AGENTS'
-    if (c === D + 2) return 'WORKFLOW'
-    return 'OUTPUTS & DUTIES'
+    if (c === 0) return 'Tools and data'
+    if (c <= D) return c === D ? 'Sub-agents' : 'Nested sub-agents'
+    if (c === D + 1) return 'Agents'
+    if (c === D + 2) return 'Workflow'
+    return 'Outputs and duties'
   }
   const cols = [...new Set(nodes.map((n) => n.col))].sort((a, b) => a - b)
 

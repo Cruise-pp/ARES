@@ -49,9 +49,10 @@ function Side({ run, kind, nodes }: { run: Run | null; kind: 'predict' | 'actual
   }
   const l = listsOf(run)
   const name = (id: string) => nodeLabel(nodes.get(id), id)
+  const warn = l.workflows.length - l.paused.length
   return (
     <div className={`side-box ${kind}`}>
-      <div className="eyebrow" style={{ marginBottom: 10, color: 'inherit' }}>
+      <div className="eyebrow" style={{ marginBottom: 14 }}>
         {kind === 'predict' ? 'Radius predicts' : 'After the team adopts it'}
       </div>
       <div className="big">
@@ -59,18 +60,18 @@ function Side({ run, kind, nodes }: { run: Run | null; kind: 'predict' | 'actual
         <span>{kind === 'predict' ? 'agents break the rule' : 'agents broke the rule'}</span>
       </div>
       <div className="big">
-        <b>{l.paused.length}</b>
+        <b className={l.paused.length ? 'red' : ''}>{l.paused.length}</b>
         <span>{kind === 'predict' ? 'workflows would pause' : 'workflows paused'}</span>
       </div>
-      <div style={{ fontSize: 12, opacity: 0.8 }}>
-        of {plural(l.workflows.length, 'workflow')} reached · the rest {kind === 'predict' ? 'would warn' : 'warned'}
-      </div>
-      <div className="names">{l.agents.map(name).join(' · ')}</div>
-      <div style={{ marginTop: 10 }}>
-        <Link to={`/runs/${encodeURIComponent(run.run_id)}`} style={{ fontSize: 12, textDecoration: 'underline' }}>
-          Open the {kind === 'predict' ? 'preview' : 'run'}
-        </Link>
-      </div>
+      <div className="names">{l.agents.map(name).join(', ')}</div>
+      {warn > 0 && (
+        <div className="names quiet">
+          {plural(warn, 'more workflow', 'more workflows')} {kind === 'predict' ? 'would get' : 'got'} a warning.
+        </div>
+      )}
+      <Link className="inline-link" to={`/runs/${encodeURIComponent(run.run_id)}`} style={{ fontSize: 13, marginTop: 12, display: 'inline-block' }}>
+        {kind === 'predict' ? 'See it on the graph' : 'See the run'}
+      </Link>
     </div>
   )
 }
@@ -131,8 +132,8 @@ export function Policy() {
         <h1 className="page-title" style={{ margin: 0 }}>
           Policy preview
         </h1>
-        <span className="badge none">NOTHING PAUSES</span>
       </div>
+      <p className="page-lede">Try a rule before the team adopts it. Nothing pauses while you look.</p>
 
       <form
         onSubmit={(e) => {
@@ -145,7 +146,7 @@ export function Policy() {
           <span className="eyebrow">Draft rule</span>
           <input value={text} onChange={(e) => setText(e.target.value)} aria-label="Draft rule" />
         </label>
-        <button className="btn primary" disabled={busy || !text.trim()} type="submit">
+        <button className={`btn ${predicted ? '' : 'primary'}`} disabled={busy || !text.trim()} type="submit">
           Preview
         </button>
       </form>
@@ -162,18 +163,7 @@ export function Policy() {
         </div>
       )}
 
-      {parsed?.state === 'exact' && (
-        <div className="muted" style={{ marginTop: 12, fontSize: 12 }}>
-          Radius read this as{' '}
-          <span className="mono">
-            {parsed.change.target} where{' '}
-            {('all' in parsed.change.where ? parsed.change.where.all : parsed.change.where.any)
-              .map((c) => `${c.field} ${c.op} ${Array.isArray(c.value) ? `[${c.value.join(', ')}]` : c.value}`)
-              .join(' ∧ ')}
-          </span>{' '}
-          · {parsed.readback}
-        </div>
-      )}
+      {parsed?.state === 'exact' && <p className="page-lede small">{parsed.readback}</p>}
 
       {error && (
         <div className="error-box" style={{ marginTop: 14 }}>
@@ -190,10 +180,17 @@ export function Policy() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 16 }}>
-        <button className="btn" onClick={apply} disabled={busy || !predicted || !!actual}>
-          Apply the rule
-        </button>
-        {cmp && <span className={`verdict-pill ${cmp.match ? '' : 'bad'}`}>{cmp.match ? 'LISTS MATCH' : 'LISTS DIFFER'}</span>}
+        {!cmp && (
+          <button className={`btn ${predicted ? 'primary' : ''}`} onClick={apply} disabled={busy || !predicted || !!actual}>
+            Apply the rule
+          </button>
+        )}
+        {cmp && (
+          <span className={`verdict ${cmp.match ? 'ok' : 'bad'}`} role="status">
+            <span className="check">{cmp.match ? '✓' : '!'}</span>
+            {cmp.match ? 'The lists match. The prediction was right.' : 'The lists differ. See what changed below.'}
+          </span>
+        )}
         {API_MODE === 'mock' && (
           <label className="faint" style={{ fontSize: 12, marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
             <input type="checkbox" checked={forceDiff} onChange={(e) => setForceDiff(e.target.checked)} />

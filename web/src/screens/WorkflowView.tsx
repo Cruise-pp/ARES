@@ -4,18 +4,29 @@ import { api, runCache } from '../api/client'
 import { useAsync, useGraph } from '../api/hooks'
 import type { Run } from '../api/types'
 import { flowActAt, WorkflowGraph, type FlowTone } from '../components/WorkflowGraph'
-import { ownerName, plural, splitTitle } from '../lib/format'
+import { plural, splitTitle } from '../lib/format'
 import { workflowFlow } from '../lib/flow'
-import { EASE, setMotionPref, useMotionPref, zoomAbout } from '../lib/motion'
+import { joinNames } from '../lib/story'
+import { nextOf } from './TaskMessage'
+import { EASE, useMotionPref, zoomAbout } from '../lib/motion'
 import { MAX_HOPS, pathSteps, workflowRows, type WorkflowStatus } from '../lib/reach'
 
-const STATUS_BADGE: Partial<Record<WorkflowStatus, { text: string; cls: string }>> = {
-  paused: { text: 'PAUSED', cls: 'high' },
-  would_pause: { text: 'WOULD PAUSE', cls: 'high' },
-  warned: { text: 'WARNED', cls: 'warned' },
-  would_warn: { text: 'WOULD WARN', cls: 'warned' },
-  resumed: { text: 'RESUMED', cls: 'resumed' },
-  beyond: { text: 'BEYOND 4 HOPS', cls: 'preview' },
+const STATUS_PHRASE: Partial<Record<WorkflowStatus, string>> = {
+  paused: 'is paused',
+  would_pause: 'would pause',
+  warned: 'keeps running, with a warning',
+  would_warn: 'would keep running, with a warning',
+  resumed: 'is running again',
+  beyond: 'is reached, but too far away to act on',
+}
+
+const STATUS_TEXT: Partial<Record<WorkflowStatus, string>> = {
+  paused: 'Paused',
+  would_pause: 'Would pause',
+  warned: 'Running, with a warning',
+  would_warn: 'Would warn',
+  resumed: 'Running again',
+  beyond: 'Shown, not acted on',
 }
 
 export function WorkflowView() {
@@ -39,7 +50,7 @@ export function WorkflowView() {
 function WorkflowScene({ run, wfId, graph }: { run: Run | null; wfId: string; graph: NonNullable<ReturnType<typeof useGraph>['graph']> }) {
   const navigate = useNavigate()
   const { nodes: graphNodes } = useGraph()
-  const { pref, reduced, systemReduced } = useMotionPref()
+  const { reduced } = useMotionPref()
   const [play, setPlay] = useState(0)
   const [animate, setAnimate] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
@@ -118,14 +129,25 @@ function WorkflowScene({ run, wfId, graph }: { run: Run | null; wfId: string; gr
 
   const carriers = (id: string) =>
     flow.edges.filter((e) => e.to === id && e.lit && flow.byId.get(e.from)!.col === 0).map((e) => flow.byId.get(e.from)!.label)
-  const parentOf = (id: string) => {
-    const e = flow.edges.find((x) => x.from === id && flow.byId.get(x.to)?.type !== 'workflow')
-    return e ? flow.byId.get(e.to)?.label : undefined
-  }
+
+  const wfName = flow.workflow?.name ?? wfId
+  const duties = flow.nodes.filter((n) => n.type === 'obligation' && n.lit).map((n) => n.label)
+  const hitSubs = hit.filter((n) => n.type === 'subagent')
+  const hitAgents = hit.filter((n) => n.type === 'agent')
+  const carried = [...new Set(hit.flatMap((n) => carriers(n.id)))]
+  const head = !run
+    ? `${wfName} runs ${plural(members.length - subCount, 'agent')} with ${plural(subCount, 'sub-agent')}.`
+    : `${wfName} ${STATUS_PHRASE[status ?? 'none'] ?? 'is reached'}${duties.length ? `, and it serves ${joinNames(duties)}` : ''}.`
+  const inside =
+    run && carried.length
+      ? hitSubs.length
+        ? ` ${joinNames(hitSubs.map((n) => n.label))}, inside ${joinNames(hitAgents.map((n) => n.label))}, ${hitSubs.length === 1 ? 'uses' : 'use'} ${joinNames(carried)}.`
+        : ` ${joinNames(hitAgents.map((n) => n.label))} ${hitAgents.length === 1 ? 'uses' : 'use'} ${joinNames(carried)}.`
+      : ''
+  const next = task && tasks.data ? nextOf(tasks.data.find((t) => t.task.id === task.id)!) : ''
 
   const selItem = selected ? run?.reached.find((r) => r.id === selected) : undefined
   const selNode = selected ? flow.byId.get(selected) : undefined
-  const skipped = reduced && pref === 'system' && systemReduced && !!run
 
   const base = run ? `/runs/${encodeURIComponent(run.run_id)}` : null
   const rowAnim = (i: number) =>
@@ -144,33 +166,17 @@ function WorkflowScene({ run, wfId, graph }: { run: Run | null; wfId: string; gr
           </Link>
         )}
         <span className="cid">{flow.workflow?.name}</span>
-        <span className="subject">{plural(members.length - subCount, 'agent')} · {plural(subCount, 'sub-agent')}</span>
-        {status && STATUS_BADGE[status] && <span className={`badge ${STATUS_BADGE[status]!.cls}`}>{STATUS_BADGE[status]!.text}</span>}
+        {status && STATUS_TEXT[status] && <span className={`state-word ${status}`}>{STATUS_TEXT[status]}</span>}
       </div>
 
       <div className="br drill">
         <section className="br-stage flow-stage" ref={stageRef}>
-          {skipped ? (
-            <div className="motion-banner">
-              Your system asks for less motion, so the reveal was skipped.
-              <button
-                className="motion-play"
-                onClick={() => {
-                  setMotionPref('on')
-                  setPlay((p) => p + 1)
-                }}
-              >
-                ▶ Play the reveal
-              </button>
-            </div>
-          ) : (
-            run &&
+          {run &&
             !animate && (
               <button className="btn ghost small replay" onClick={() => setPlay((p) => p + 1)}>
                 ↻ Replay
               </button>
-            )
-          )}
+            )}
 
           {selNode && (
             <div className="path-strip" role="status">
@@ -210,82 +216,70 @@ function WorkflowScene({ run, wfId, graph }: { run: Run | null; wfId: string; gr
           </div>
         </section>
 
-        <aside className="br-side">
-          {run ? (
-            <div className="counters two">
-              <div className="counter amber">
-                <div className="n">{hit.length}</div>
-                <div className="l">Reached inside</div>
-              </div>
-              <div className="counter">
-                <div className="n">{safe.length}</div>
-                <div className="l">Untouched</div>
-              </div>
+        <aside className="br-side panel">
+          <p className={`p-sentence ${rowAnim(0).className}`} style={rowAnim(0).style}>
+            {head}
+          </p>
+          {inside && <p className="p-sub">{inside.trim()}</p>}
+
+          <div className="p-numbers two">
+            <div>
+              <b>{run ? hit.length : members.length - subCount}</b>
+              <span>{run ? 'reached inside' : members.length - subCount === 1 ? 'agent' : 'agents'}</span>
             </div>
-          ) : (
-            <div className="counters two">
-              <div className="counter">
-                <div className="n">{members.length - subCount}</div>
-                <div className="l">Agents</div>
-              </div>
-              <div className="counter">
-                <div className="n">{subCount}</div>
-                <div className="l">Sub-agents</div>
-              </div>
+            <div>
+              <b>{run ? safe.length : subCount}</b>
+              <span>{run ? 'untouched' : 'sub-agents'}</span>
             </div>
-          )}
+          </div>
 
           {run && hit.length > 0 && (
-            <section>
-              <div className={`group-title amber ${rowAnim(0).className}`} style={rowAnim(0).style}>
-                Reached
-              </div>
+            <div className="p-list">
               {hit.map((n, i) => {
                 const a = rowAnim(i + 1)
                 const via = carriers(n.id)
-                const parent = n.type === 'subagent' ? parentOf(n.id) : undefined
                 return (
                   <button
                     key={n.id}
-                    className={`wf-item warned ${selected === n.id ? 'on' : ''} ${a.className}`}
+                    className={`p-row reached ${selected === n.id ? 'on' : ''} ${a.className}`}
                     style={a.style}
                     onClick={() => setSelected(selected === n.id ? null : n.id)}
                   >
-                    <div className="name">
-                      <span>{n.label}</span>
-                      <span className="faint" style={{ fontWeight: 400, fontSize: 11 }}>
-                        {n.type === 'subagent' ? 'sub-agent' : 'agent'}
-                      </span>
-                    </div>
-                    <div className="detail">
-                      {[via.length ? `uses ${via.join(', ')}` : null, parent ? `inside ${parent}` : null].filter(Boolean).join(' · ') ||
-                        'reached through its sub-agents'}
-                    </div>
+                    <span className="p-name">{n.label}</span>
+                    <span className="p-next">
+                      {via.length ? `Uses ${via.join(', ')}` : `Reached through its sub-agents`}
+                    </span>
+                    <span className="chev">›</span>
                   </button>
                 )
               })}
-            </section>
+            </div>
           )}
 
           {safe.length > 0 && (
-            <div className={`safe-list ${rowAnim(hit.length + 1).className}`} style={rowAnim(hit.length + 1).style}>
-              <div className="group-title grey">{run ? 'Untouched' : 'Inside'}</div>
-              {safe.map((n) => n.label).join(' · ')}
+            <div className={`p-caption ${rowAnim(hit.length + 1).className}`} style={rowAnim(hit.length + 1).style}>
+              {run ? 'Untouched: ' : 'Inside: '}
+              {safe.map((n) => n.label).join(', ')}
             </div>
           )}
 
-          <div className={`side-foot ${rowAnim(hit.length + 2).className}`} style={rowAnim(hit.length + 2).style}>
-            <div className="duty-line">Owner · {ownerName(flow.workflow?.owner_id)}</div>
-            <div className="quiet-links">
-              {task && <Link to={`/task/${encodeURIComponent(task.id)}`}>Owner message →</Link>}
-              {base && run!.incidents.length > 0 && <Link to={`${base}/incident`}>Incident →</Link>}
-            </div>
+          <div className={`p-foot ${rowAnim(hit.length + 2).className}`} style={rowAnim(hit.length + 2).style}>
+            {task && next && <div className="p-step">{next}</div>}
+            {task && (
+              <Link className="btn primary wide" to={`/task/${encodeURIComponent(task.id)}`}>
+                Send this next step
+              </Link>
+            )}
             {others.length > 0 && (
-              <div className="switcher">
-                {others.map((o) => (
-                  <button key={o.id} className={`chip-btn ${o.status}`} onClick={leave(`${base}/workflows/${encodeURIComponent(o.id)}`, { zoomIn: { x: 0, y: 0 } })}>
-                    {o.name}
-                  </button>
+              <div className="p-caption center">
+                Also reached:{' '}
+                {others.map((o, i) => (
+                  <span key={o.id}>
+                    {i > 0 && ', '}
+                    <a href="#" className={`inline-link ${o.status}`} onClick={leave(`${base}/workflows/${encodeURIComponent(o.id)}`, { zoomIn: { x: 0, y: 0 } })}>
+                      {o.name}
+                    </a>
+                  </span>
                 ))}
               </div>
             )}

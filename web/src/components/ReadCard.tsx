@@ -130,10 +130,10 @@ export function ReadCard({ parsed, graph, busy, onEdit, onPick, onFire, onPrevie
   const { effect } = change
   return (
     <div className="readcard exact">
-      <div className="eyebrow">Radius read this as</div>
-      <div className="chips">
+      <div className="chips rc-sentence">
+        <span className="rc-word">Radius read this as a</span>
         <span className="chip kind editable" onClick={() => setOpen('kind')}>
-          {kindLabel(change.kind)} ▾
+          {kindLabel(change.kind).toLowerCase()} ▾
           {open === 'kind' && (
             <Menu
               items={Object.values(KIND_LABEL)}
@@ -147,11 +147,12 @@ export function ReadCard({ parsed, graph, busy, onEdit, onPick, onFire, onPrevie
             />
           )}
         </span>
+        <span className="rc-word">in</span>
         {cs.map((c, i) => {
           const key = `c${i}`
           return (
             <span key={key} className="chip editable" title={`${change.target}.${c.field} ${c.op}`} onClick={() => setOpen(key)}>
-              {cs.length > 1 && c.field !== 'name' && <span className="op">{c.field}</span>}
+              {cs.length > 1 && c.field !== 'name' && <span className="op field">{c.field}</span>}
               {OP_TEXT[c.op] && <span className="op">{OP_TEXT[c.op]}</span>}
               {show(c.value)}
               {open === key && (
@@ -169,9 +170,19 @@ export function ReadCard({ parsed, graph, busy, onEdit, onPick, onFire, onPrevie
             </span>
           )
         })}
-        {effect.ref && <span className="chip mono">{effect.ref}</span>}
-        {effect.fix && <span className="chip">fix {effect.fix}</span>}
-        {effect.label && <span className="chip">label {effect.label}</span>}
+        {effect.fix && (
+          <>
+            <span className="rc-word">fixed in</span>
+            <span className="chip">{effect.fix}</span>
+          </>
+        )}
+        {effect.label && (
+          <>
+            <span className="rc-word">now</span>
+            <span className="chip">{effect.label}</span>
+          </>
+        )}
+        {effect.ref && <span className="rc-word muted">{effect.ref}</span>}
       </div>
       <div
         className="readback"

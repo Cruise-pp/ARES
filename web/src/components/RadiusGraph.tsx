@@ -121,7 +121,7 @@ export function RadiusGraph({ layout, tones, limit, actionHops, animate, waiting
           <g key={r.index} opacity={r.index > limit + (layout.multiStart ? 1 : 0) ? 0.35 : 1}>
             <circle className="ring-guide" cx={CENTER} cy={CENTER} r={r.r} />
             <text className="ring-label" x={CENTER} y={CENTER - r.r - 6}>
-              {r.label}
+              {r.label.charAt(0) + r.label.slice(1).toLowerCase()}
             </text>
           </g>
         ))}

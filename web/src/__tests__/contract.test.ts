@@ -6,6 +6,8 @@ import runS1 from '../mocks/run_S1.json'
 import { mockOptions, mockServer, resetMock } from '../mocks/server'
 import { workflowFlow } from '../lib/flow'
 import { radialLayout } from '../lib/layout'
+import { getMotionPref, motionReduced } from '../lib/motion'
+import { storySentence } from '../lib/story'
 import { countVisible, withinHops } from '../lib/reach'
 import { compareLists, listsOf } from '../screens/Policy'
 
@@ -62,7 +64,7 @@ describe('workflow drill-down', () => {
     const run = runS1 as Run
     const flow = workflowFlow('wf_finance_feed', g, new Set(run.reached.map((r) => r.id)))
     const col = (id: string) => flow.byId.get(id)!.col
-    expect(flow.columns.map((c) => c.label)).toEqual(['TOOLS & DATA', 'NESTED SUB-AGENTS', 'SUB-AGENTS', 'AGENTS', 'WORKFLOW', 'OUTPUTS & DUTIES'])
+    expect(flow.columns.map((c) => c.label)).toEqual(['Tools and data', 'Nested sub-agents', 'Sub-agents', 'Agents', 'Workflow', 'Outputs and duties'])
     expect(col('tl_pdf_parse_214')).toBe(0)
     expect(col('sa_vendor_matcher')).toBe(1)
     expect(col('sa_line_item_parser')).toBe(2)
@@ -241,5 +243,34 @@ describe('live normalisers', () => {
     const task = { id: 't', owner_id: 'o', workflow_id: 'w', incident_id: null, message: 'm', state: 'open' as const }
     expect(normalizeTask({ task, incident: null }).task.id).toBe('t')
     expect(normalizeTask({ ...task, incident: null }).task.id).toBe('t')
+  })
+})
+
+describe('panel sentence', () => {
+  it('names what stopped and the duty it serves', () => {
+    expect(
+      storySentence({
+        preview: false,
+        paused: [
+          { name: 'Customer reply', duties: [] },
+          { name: 'Finance feed', duties: ['SOX 404'] },
+        ],
+        warned: ['Contract review'],
+        resumed: [],
+      }),
+    ).toBe('Customer reply and Finance feed are paused — Finance feed serves SOX 404.')
+    expect(storySentence({ preview: false, paused: [{ name: 'Finance feed', duties: ['SOX 404'] }], warned: [], resumed: [] })).toBe(
+      'Finance feed is paused, and it serves SOX 404.',
+    )
+    expect(storySentence({ preview: true, paused: [], warned: [], resumed: [] })).toBe('If you fire this, nothing pauses.')
+    expect(storySentence({ preview: false, paused: [], warned: [], resumed: ['Finance feed'] })).toBe('Finance feed is running again.')
+  })
+})
+
+describe('motion', () => {
+  it('plays when nobody has chosen, and only "off" or "system" can stop it', () => {
+    expect(getMotionPref()).toBe('on')
+    expect(motionReduced('on')).toBe(false)
+    expect(motionReduced('off')).toBe(true)
   })
 })
