@@ -37,7 +37,7 @@ function valuesFor(graph: Graph | null, change: ChangeEvent, cond: Cond): string
 /** Agents that use or read a node, counted from the graph for the card (no search). */
 export function usersOf(graph: Graph | null, id: string): number {
   if (!graph) return 0
-  return graph.edges.filter((e) => e.target === id && (e.type === 'RUNS_ON' || e.type === 'READS')).length
+  return graph.edges.filter((e) => e.target === id && (e.type === 'RUNS_ON' || e.type === 'READS')).filter((e) => graph.nodes.find((n) => n.id === e.source)?.type === 'agent').length
 }
 
 function Menu({ items, current, onPick, onClose }: { items: string[]; current: string; onPick: (v: string) => void; onClose: () => void }) {
@@ -80,26 +80,27 @@ interface Props {
   onFire?: () => void
   onPreview?: () => void
   onUnmatched?: () => void
+  saved?: boolean
   fireLabel?: string
 }
 
-export function ReadCard({ parsed, graph, busy, onEdit, onPick, onFire, onPreview, onUnmatched, fireLabel = 'Fire' }: Props) {
+export function ReadCard({ parsed, graph, busy, onEdit, onPick, onFire, onPreview, onUnmatched, saved, fireLabel = 'Fire' }: Props) {
   const [open, setOpen] = useState<string | null>(null)
   const { change, state } = parsed
 
   if (state === 'none') {
     return (
       <div className="readcard none">
-        <div className="eyebrow">Unmatched</div>
-        {change.source?.raw && <p style={{ margin: '0 0 8px' }}>“{change.source.raw}”</p>}
-        <p className="muted" style={{ margin: '0 0 14px', fontSize: 13 }}>
-          {parsed.reason ?? parsed.readback}
-        </p>
-        {onUnmatched && (
-          <button className="btn small" onClick={onUnmatched} style={{ color: 'var(--blue)', borderColor: 'var(--blue)' }}>
-            → Unmatched queue
-          </button>
-        )}
+        <div className="eyebrow">Nothing in the graph matches</div>
+        <p className="readback" style={{ marginTop: 0 }}>{parsed.reason ?? parsed.readback}</p>
+        {onUnmatched &&
+          (saved ? (
+            <span className="faint" style={{ fontSize: 13 }}>Kept for a person to read.</span>
+          ) : (
+            <button className="btn small" onClick={onUnmatched}>
+              Keep it for a person
+            </button>
+          ))}
       </div>
     )
   }
@@ -107,8 +108,8 @@ export function ReadCard({ parsed, graph, busy, onEdit, onPick, onFire, onPrevie
   if (state === 'ambiguous') {
     return (
       <div className="readcard ambiguous">
-        <div className="eyebrow">Ambiguous · pick one</div>
-        <p style={{ margin: '0 0 12px', fontSize: 13 }}>{parsed.readback}</p>
+        <div className="eyebrow">Which one did you mean?</div>
+        <p className="readback" style={{ marginTop: 0 }}>{parsed.readback}</p>
         {parsed.candidates.map((c) => {
           const n = usersOf(graph, c.id)
           return (
@@ -118,18 +119,8 @@ export function ReadCard({ parsed, graph, busy, onEdit, onPick, onFire, onPrevie
             </button>
           )
         })}
-        <div className="faint" style={{ fontSize: 12, marginTop: 6 }}>
-          Fire stays off until one is picked.
-        </div>
-        <div className="actions" style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-          <button className="btn primary small" disabled>
-            {fireLabel}
-          </button>
-          {onPreview && (
-            <button className="btn small" disabled>
-              Preview
-            </button>
-          )}
+        <div className="faint" style={{ fontSize: 12, marginTop: 8 }}>
+          Fire stays off until you pick one.
         </div>
       </div>
     )
@@ -139,7 +130,7 @@ export function ReadCard({ parsed, graph, busy, onEdit, onPick, onFire, onPrevie
   const { effect } = change
   return (
     <div className="readcard exact">
-      <div className="eyebrow">Exact · Radius read this as</div>
+      <div className="eyebrow">Radius read this as</div>
       <div className="chips">
         <span className="chip kind editable" onClick={() => setOpen('kind')}>
           {kindLabel(change.kind)} ▾
@@ -182,7 +173,12 @@ export function ReadCard({ parsed, graph, busy, onEdit, onPick, onFire, onPrevie
         {effect.fix && <span className="chip">fix {effect.fix}</span>}
         {effect.label && <span className="chip">label {effect.label}</span>}
       </div>
-      <div className="readback">{parsed.readback}</div>
+      <div
+        className="readback"
+        title={change.parse ? `read by ${change.parse.by}${change.parse.confidence !== undefined ? ` · confidence ${change.parse.confidence}` : ''}` : undefined}
+      >
+        {parsed.readback}
+      </div>
       <div className="actions">
         {onFire && (
           <button className="btn primary" onClick={onFire} disabled={busy}>
@@ -195,13 +191,6 @@ export function ReadCard({ parsed, graph, busy, onEdit, onPick, onFire, onPrevie
           </button>
         )}
       </div>
-      {change.parse && (
-        <div className="receipt">
-          read by {change.parse.by}
-          {change.parse.confidence !== undefined && ` · confidence ${change.parse.confidence}`}
-          {change.parse.receipt && ` · ${change.parse.receipt}`}
-        </div>
-      )}
     </div>
   )
 }

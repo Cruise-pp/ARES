@@ -4,6 +4,7 @@ import type { Run } from '../api/types'
 import { buildReached } from '../mocks/fixtures'
 import runS1 from '../mocks/run_S1.json'
 import { mockOptions, mockServer, resetMock } from '../mocks/server'
+import { workflowFlow } from '../lib/flow'
 import { radialLayout } from '../lib/layout'
 import { countVisible, withinHops } from '../lib/reach'
 import { compareLists, listsOf } from '../screens/Policy'
@@ -29,7 +30,48 @@ describe('S1 fixture (page 31d)', () => {
       expect(b.hops).toBe(r.path.length - 1)
       expect(b.type).toBe(r.type)
     }
-    expect(graph.nodes.length - run.reached.length).toBe(run.counts.untouched)
+    const platform = (xs: { type: string }[]) => xs.filter((x) => x.type !== 'subagent').length
+    expect(platform(graph.nodes) - platform(run.reached)).toBe(run.counts.untouched)
+  })
+
+  it('adds sub-agents to reached without moving the counts', () => {
+    const subs = run.reached.filter((r) => r.type === 'subagent').map((r) => r.id).sort()
+    expect(subs).toEqual(['sa_attachment_reader', 'sa_clause_extractor', 'sa_line_item_parser', 'sa_page_splitter'])
+    expect(run.reached.filter((r) => r.type === 'subagent').every((r) => r.hops === 1 && r.via[0] === 'RUNS_ON')).toBe(true)
+    const live = mockServer.postChange(mockServer.parseChange('pdf-parse 2.1.4 has a CVE. Fixed in 2.1.6.').change, 'live')
+    expect(live.counts).toEqual(run.counts)
+  })
+
+  it('every sub-agent uses only what its parent agent already lists', () => {
+    const g = mockServer.getGraph()
+    const uses = (id: string) => new Set(g.edges.filter((e) => e.source === id && (e.type === 'RUNS_ON' || e.type === 'READS')).map((e) => e.target))
+    const agentOf = (id: string): string => {
+      const p = g.edges.find((e) => e.type === 'DELEGATES' && e.target === id)!.source
+      return g.nodes.find((n) => n.id === p)!.type === 'agent' ? p : agentOf(p)
+    }
+    for (const sa of g.nodes.filter((n) => n.type === 'subagent')) {
+      const parent = uses(agentOf(sa.id))
+      for (const t of uses(sa.id)) expect(parent.has(t), `${sa.id} → ${t}`).toBe(true)
+    }
+  })
+})
+
+describe('workflow drill-down', () => {
+  it('lays tools, sub-agents, agents, workflow and outputs left to right, lit from reached', () => {
+    const g = mockServer.getGraph()
+    const run = runS1 as Run
+    const flow = workflowFlow('wf_finance_feed', g, new Set(run.reached.map((r) => r.id)))
+    const col = (id: string) => flow.byId.get(id)!.col
+    expect(flow.columns.map((c) => c.label)).toEqual(['TOOLS & DATA', 'NESTED SUB-AGENTS', 'SUB-AGENTS', 'AGENTS', 'WORKFLOW', 'OUTPUTS & DUTIES'])
+    expect(col('tl_pdf_parse_214')).toBe(0)
+    expect(col('sa_vendor_matcher')).toBe(1)
+    expect(col('sa_line_item_parser')).toBe(2)
+    expect(col('ag_invoice_extractor')).toBe(3)
+    expect(col('wf_finance_feed')).toBe(4)
+    const lit = flow.nodes.filter((n) => n.lit).map((n) => n.id).sort()
+    expect(lit).toEqual(['ag_invoice_extractor', 'ob_sox_404', 'out_gl_posting', 'sa_line_item_parser', 'sa_page_splitter', 'tl_pdf_parse_214', 'wf_finance_feed'].sort())
+    // The agent's own pdf-parse edge is a roll-up of its sub-agents' edges, so it is not drawn twice.
+    expect(flow.edges.some((e) => e.from === 'tl_pdf_parse_214' && e.to === 'ag_invoice_extractor')).toBe(false)
   })
 })
 
@@ -156,8 +198,9 @@ describe('layout', () => {
     const g = mockServer.getGraph()
     const nodes = new Map(g.nodes.map((n) => [n.id, n]))
     const run = runS1 as Run
-    const a = radialLayout(run.reached, nodes, g.edges)
-    const b = radialLayout([...run.reached].reverse(), nodes, g.edges)
+    const reached = run.reached.filter((r) => r.type !== 'subagent')
+    const a = radialLayout(reached, nodes, g.edges)
+    const b = radialLayout([...reached].reverse(), nodes, g.edges)
     expect(a.nodes.map((n) => [n.id, n.x.toFixed(2), n.y.toFixed(2)])).toEqual(
       b.nodes.map((n) => [n.id, n.x.toFixed(2), n.y.toFixed(2)]),
     )

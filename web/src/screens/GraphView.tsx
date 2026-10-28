@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useGraph } from '../api/hooks'
 import type { GraphNode, NodeType } from '../api/types'
 import { nodeLabel, ownerName, TYPE_PLURAL } from '../lib/format'
@@ -10,6 +11,7 @@ const TOP = 46
 const LEFT = 40
 
 const FILL: Record<NodeType, string> = {
+  subagent: 'var(--amber)',
   tool: 'var(--red)',
   data: 'var(--red)',
   agent: 'var(--amber)',
@@ -77,11 +79,11 @@ export function GraphView() {
     <div className="graph-wrap">
       <div className="graph-stats">
         <div>
-          <div className="n">{graph.nodes.length}</div>
+          <div className="n">{graph.nodes.filter((n) => n.type !== 'subagent').length}</div>
           <div className="l">nodes</div>
         </div>
         <div>
-          <div className="n">{graph.edges.length}</div>
+          <div className="n">{graph.edges.filter((e) => e.type !== 'DELEGATES' && !e.source.startsWith('sa_')).length}</div>
           <div className="l">links</div>
         </div>
         {COLUMNS.map((t) => (
@@ -102,6 +104,14 @@ export function GraphView() {
           {sel ? (
             <>
               <b>{nodeLabel(sel)}</b> <span className="muted">· {sel.type} · {ownerName(sel.owner_id)}</span>
+              {sel.type === 'workflow' && (
+                <>
+                  {' '}
+                  <Link to={`/workflows/${encodeURIComponent(sel.id)}`} style={{ color: 'var(--blue)' }}>
+                    Open its agents →
+                  </Link>
+                </>
+              )}
               <div className="muted">
                 {DETAIL_FIELDS.filter((f) => sel[f] !== undefined && sel[f] !== null)
                   .map((f) => `${f}: ${Array.isArray(sel[f]) ? (sel[f] as string[]).join(', ') || '—' : String(sel[f])}`)

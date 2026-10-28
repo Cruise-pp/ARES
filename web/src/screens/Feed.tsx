@@ -25,7 +25,7 @@ export function Feed() {
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return
       if (e.key === '/' || e.key === 'n') {
         e.preventDefault()
-        navigate('/enter')
+        navigate('/')
       }
     }
     window.addEventListener('keydown', onKey)
@@ -121,7 +121,7 @@ export function Feed() {
                 Reset mock
               </button>
             )}
-            <button className="btn primary wide" onClick={() => navigate('/enter')}>
+            <button className="btn primary wide" onClick={() => navigate('/')}>
               Enter a change
             </button>
           </div>
@@ -137,7 +137,7 @@ export function Feed() {
                 <div>“{u.raw}”</div>
                 <div className="reason">{u.reason}</div>
               </div>
-              <button className="btn small" onClick={() => navigate('/enter', { state: { text: u.raw } })}>
+              <button className="btn small" onClick={() => navigate('/', { state: { text: u.raw } })}>
                 Map it
               </button>
               <button

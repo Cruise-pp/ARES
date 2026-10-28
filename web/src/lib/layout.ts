@@ -43,7 +43,7 @@ export interface Layout {
 }
 
 const TYPE_ORDER: Record<string, number> = { tool: 0, data: 1, agent: 2, workflow: 3, obligation: 4, output: 5 }
-const DEFAULT_RING: Record<NodeType, number> = { tool: 1, data: 1, agent: 1, workflow: 2, obligation: 3, output: 3 }
+const DEFAULT_RING: Record<NodeType, number> = { tool: 1, data: 1, agent: 1, subagent: 1, workflow: 2, obligation: 3, output: 3 }
 const DEG = Math.PI / 180
 
 const byTypeThenId = (a: { type: string; id: string }, b: { type: string; id: string }) =>
@@ -94,7 +94,7 @@ export function radialLayout(
   const GHOST_PRIORITY: Record<string, number> = { workflow: 0, agent: 1, tool: 2, data: 3, obligation: 4, output: 5 }
   const ghosts = [...ghostIds]
     .map((id) => graphNodes.get(id))
-    .filter((n): n is GraphNode => !!n)
+    .filter((n): n is GraphNode => !!n && n.type !== 'subagent')
     .sort((a, b) => GHOST_PRIORITY[a.type] - GHOST_PRIORITY[b.type] || a.id.localeCompare(b.id))
     .slice(0, ghostCap)
     .sort(byTypeThenId)

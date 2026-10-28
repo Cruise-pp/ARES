@@ -52,6 +52,7 @@ export const TYPE_PLURAL: Record<NodeType, string> = {
   tool: 'tools',
   data: 'data',
   agent: 'agents',
+  subagent: 'sub-agents',
   workflow: 'workflows',
   obligation: 'duties',
   output: 'outputs',
@@ -66,6 +67,7 @@ export const EDGE_VERB: Record<EdgeType, string> = {
   RUNS_ON: 'used by',
   READS: 'read by',
   INVOKES: 'run by',
+  DELEGATES: 'part of',
   SERVES: 'serves',
   SENDS: 'sends',
 }

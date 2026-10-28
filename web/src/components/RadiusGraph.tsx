@@ -91,6 +91,7 @@ export function RadiusGraph({ layout, tones, limit, actionHops, animate, flashId
           <stop offset="60%" stopColor="var(--red)" stopOpacity="0.06" />
           <stop offset="100%" stopColor="var(--red)" stopOpacity="0" />
         </radialGradient>
+        <GlowFilter />
       </defs>
 
       <circle cx={CENTER} cy={CENTER} r={layout.rings[layout.rings.length - 1]?.r ?? 250} fill="url(#halo)" opacity={0.6} />
@@ -158,10 +159,21 @@ export function RadiusGraph({ layout, tones, limit, actionHops, animate, flashId
           if (flash) nodeAnim.style = { animationDelay: `${d + REVEAL.nodeAfterEdge}ms, ${act}ms` }
           const labelAnim = anim('fade', d + REVEAL.labelAfterEdge)
           const right = n.x >= CENTER - 1
+          const tone = tones.get(n.id)
+          const lit = tone === 'paused' || tone === 'start'
           return (
             <g key={n.id}>
+              {flashIds.has(n.id) && n.hops <= limit && (
+                <circle
+                  className="breathe"
+                  cx={n.x}
+                  cy={n.y}
+                  r={9}
+                  style={{ animationDelay: animate ? `${act + 600}ms` : '0ms' }}
+                />
+              )}
               <circle
-                className={`node ${nodeAnim.className} ${dimmed(n.id) ? 'dim' : ''}`}
+                className={`node ${nodeAnim.className} ${lit ? 'glow' : ''} ${dimmed(n.id) ? 'dim' : ''}`}
                 cx={n.x}
                 cy={n.y}
                 r={tones.get(n.id) === 'paused' ? 8.5 : 8}
@@ -189,7 +201,7 @@ export function RadiusGraph({ layout, tones, limit, actionHops, animate, flashId
       <g>
         <circle className="halo" cx={CENTER} cy={CENTER} r={24} fill="var(--red)" opacity={0.18} />
         <circle
-          className={`node ${dimmed(root.id) ? 'dim' : ''}`}
+          className={`node glow ${dimmed(root.id) ? 'dim' : ''}`}
           cx={CENTER}
           cy={CENTER}
           r={14}
@@ -206,5 +218,18 @@ export function RadiusGraph({ layout, tones, limit, actionHops, animate, flashId
         </text>
       </g>
     </svg>
+  )
+}
+
+/** A soft bloom behind lit nodes. Filters are static, so this costs nothing when motion is off. */
+export function GlowFilter({ id = 'glow' }: { id?: string }) {
+  return (
+    <filter id={id} x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3.2" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
   )
 }

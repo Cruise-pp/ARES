@@ -1,8 +1,9 @@
 // Contract types, typed from brief page 31d (and 07b for ChangeEvent, 21 for nodes).
 // If this file and page 31d disagree, page 31d wins.
 
-export type NodeType = 'tool' | 'data' | 'agent' | 'workflow' | 'obligation' | 'output'
-export type EdgeType = 'RUNS_ON' | 'READS' | 'INVOKES' | 'SERVES' | 'SENDS'
+// 'subagent' and 'DELEGATES' are a proposed additive change (page 31d-v2), pending the human's approval.
+export type NodeType = 'tool' | 'data' | 'agent' | 'subagent' | 'workflow' | 'obligation' | 'output'
+export type EdgeType = 'RUNS_ON' | 'READS' | 'INVOKES' | 'DELEGATES' | 'SERVES' | 'SENDS'
 
 export type Target = 'tool' | 'data' | 'agent' | 'workflow' | 'obligation'
 export type Op = 'eq' | 'neq' | 'in' | 'not_in' | 'contains' | 'prefix'

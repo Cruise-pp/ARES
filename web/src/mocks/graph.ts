@@ -9,6 +9,9 @@ const data = (id: string, table: string, column: string, labels: string[], owner
 const agent = (id: string, name: string, model_id: string, model_region: string, owner_id = 'team_platform'): GraphNode => ({
   id, type: 'agent', name, model_id, model_region, owner_id,
 })
+const subagent = (id: string, name: string, model_id: string, model_region: string, owner_id = 'team_platform'): GraphNode => ({
+  id, type: 'subagent', name, model_id, model_region, owner_id,
+})
 const workflow = (id: string, name: string, owner_id: string, sends_external: boolean): GraphNode => ({
   id, type: 'workflow', name, owner_id, sends_external, state: 'running',
 })
@@ -57,6 +60,25 @@ export const MOCK_NODES: GraphNode[] = [
   agent('ag_hr_screener', 'HR screener', 'luminous-2', 'EU'),
   agent('ag_ticket_summariser', 'Ticket summariser', 'mistral-small', 'EU'),
   agent('ag_order_tracker', 'Order tracker', 'mistral-small', 'EU'),
+
+  subagent('sa_attachment_reader', 'Attachment reader', 'gpt-4.1-mini', 'US'),
+  subagent('sa_claim_classifier', 'Claim classifier', 'gpt-4.1', 'US'),
+  subagent('sa_reply_drafter', 'Reply drafter', 'gpt-4.1', 'US'),
+  subagent('sa_tone_checker', 'Tone checker', 'mistral-small', 'EU'),
+  subagent('sa_page_splitter', 'Page splitter', 'claude-haiku-4', 'US'),
+  subagent('sa_ocr_reader', 'OCR reader', 'claude-haiku-4', 'US'),
+  subagent('sa_line_item_parser', 'Line-item parser', 'claude-sonnet-4', 'US'),
+  subagent('sa_vendor_matcher', 'Vendor matcher', 'claude-haiku-4', 'US'),
+  subagent('sa_gl_coder', 'GL coder', 'claude-sonnet-4', 'US'),
+  subagent('sa_clause_extractor', 'Clause extractor', 'gpt-4.1-mini', 'US'),
+  subagent('sa_risk_flagger', 'Risk flagger', 'gpt-4.1-mini', 'US'),
+  subagent('sa_summary_writer', 'Summary writer', 'gpt-4.1-mini', 'US'),
+  subagent('sa_pdf_reader', 'PDF reader', 'gpt-x', 'US'),
+  subagent('sa_chart_maker', 'Chart maker', 'gpt-x', 'US'),
+  subagent('sa_narrative_writer', 'Narrative writer', 'gpt-x', 'US'),
+  subagent('sa_language_detector', 'Language detector', 'mistral-small', 'EU'),
+  subagent('sa_ticket_tagger', 'Ticket tagger', 'mistral-small', 'EU'),
+  subagent('sa_sms_composer', 'SMS composer', 'mistral-large', 'EU'),
 
   workflow('wf_customer_reply', 'Customer reply', 'team_support_ops', true),
   workflow('wf_finance_feed', 'Finance feed', 'team_finance_ops', true),
@@ -147,6 +169,37 @@ export const MOCK_EDGES: GraphEdge[] = [
   ...E('wf_translation_service', 'INVOKES', 'ag_translation_bot'),
   ...E('wf_hiring_pipeline', 'INVOKES', 'ag_hr_screener'),
   ...E('wf_document_archive', 'INVOKES', 'ag_translation_bot'),
+
+  // Sub-agents (proposed DELEGATES edge). Each one uses only tools and data its parent already lists.
+  ...E('ag_claims_reader', 'DELEGATES', 'sa_attachment_reader', 'sa_claim_classifier', 'sa_reply_drafter'),
+  ...E('sa_reply_drafter', 'DELEGATES', 'sa_tone_checker'),
+  ...E('sa_attachment_reader', 'RUNS_ON', 'tl_pdf_parse_214'),
+  ...E('sa_claim_classifier', 'RUNS_ON', 'tl_langchain_031'),
+  ...E('sa_reply_drafter', 'READS', 'dt_customers_phone'),
+  ...E('sa_tone_checker', 'RUNS_ON', 'tl_langchain_031'),
+
+  ...E('ag_invoice_extractor', 'DELEGATES', 'sa_page_splitter', 'sa_ocr_reader', 'sa_line_item_parser', 'sa_gl_coder'),
+  ...E('sa_line_item_parser', 'DELEGATES', 'sa_vendor_matcher'),
+  ...E('sa_page_splitter', 'RUNS_ON', 'tl_pdf_parse_214'),
+  ...E('sa_ocr_reader', 'RUNS_ON', 'tl_ocr_core_302'),
+  ...E('sa_line_item_parser', 'RUNS_ON', 'tl_pdf_parse_214'),
+  ...E('sa_line_item_parser', 'READS', 'dt_invoices_amount'),
+  ...E('sa_vendor_matcher', 'READS', 'dt_invoices_amount'),
+
+  ...E('ag_contract_summariser', 'DELEGATES', 'sa_clause_extractor', 'sa_risk_flagger', 'sa_summary_writer'),
+  ...E('sa_clause_extractor', 'RUNS_ON', 'tl_pdf_parse_214'),
+  ...E('sa_clause_extractor', 'READS', 'dt_contracts_text'),
+  ...E('sa_risk_flagger', 'RUNS_ON', 'tl_langchain_031'),
+
+  ...E('ag_report_builder', 'DELEGATES', 'sa_pdf_reader', 'sa_chart_maker', 'sa_narrative_writer'),
+  ...E('sa_pdf_reader', 'RUNS_ON', 'tl_pdf_parse_213'),
+  ...E('sa_chart_maker', 'RUNS_ON', 'tl_pandas_210'),
+
+  ...E('ag_support_triage', 'DELEGATES', 'sa_language_detector', 'sa_ticket_tagger', 'sa_sms_composer'),
+  ...E('sa_language_detector', 'RUNS_ON', 'tl_translate_sdk_140'),
+  ...E('sa_ticket_tagger', 'RUNS_ON', 'tl_langchain_031'),
+  ...E('sa_ticket_tagger', 'READS', 'dt_tickets_body'),
+  ...E('sa_sms_composer', 'READS', 'dt_customers_phone'),
 
   ...E('wf_finance_feed', 'SERVES', 'ob_sox_404'),
   ...E('wf_board_pack', 'SERVES', 'ob_sox_404'),

@@ -64,7 +64,7 @@ async function mock<T>(fn: (m: typeof import('../mocks/server')) => T): Promise<
 
 // ---------------------------------------------------------------- normalisers
 
-const EDGE_TYPES: EdgeType[] = ['RUNS_ON', 'READS', 'INVOKES', 'SERVES', 'SENDS']
+const EDGE_TYPES: EdgeType[] = ['RUNS_ON', 'READS', 'INVOKES', 'DELEGATES', 'SERVES', 'SENDS']
 
 type LooseEdge = Partial<GraphEdge> & { from?: string; to?: string; src?: string; dst?: string }
 

@@ -47,6 +47,8 @@ export const SPECS: RunSpec[] = [
       ['dt_customers_phone', 'ag_claims_reader'],
       ['dt_customers_phone', 'ag_kyc_checker'],
       ['dt_customers_phone', 'ag_support_triage'],
+      ['dt_customers_phone', 'sa_reply_drafter'],
+      ['dt_customers_phone', 'sa_sms_composer'],
       ['dt_customers_phone', 'ag_callback_scheduler', 'wf_callback_booking'],
       ['dt_customers_phone', 'ag_churn_predictor', 'wf_churn_dashboard'],
       ['dt_customers_phone', 'ag_churn_predictor', 'wf_retention_offers'],
@@ -137,7 +139,7 @@ export const SPECS: RunSpec[] = [
   {
     key: 'pdf_parse_213',
     starts: ['tl_pdf_parse_213'],
-    paths: [['tl_pdf_parse_213'], ...REPORT_BUILDER_REACH(['tl_pdf_parse_213'])],
+    paths: [['tl_pdf_parse_213'], ['tl_pdf_parse_213', 'sa_pdf_reader'], ...REPORT_BUILDER_REACH(['tl_pdf_parse_213'])],
     verdicts: [
       ['wf_audit_sampling', 'high', 'paused'],
       ['wf_board_pack', 'high', 'paused'],
@@ -214,7 +216,8 @@ export function buildRun(
     warned: verdicts.filter((v) => v.action === 'warned').length,
     duties: count('obligation'),
     outputs: count('output'),
-    untouched: graph.nodes.length - reached.length,
+    untouched:
+      graph.nodes.filter((n) => n.type !== 'subagent').length - reached.filter((r) => r.type !== 'subagent').length,
   }
   return {
     run_id,

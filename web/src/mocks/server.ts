@@ -131,7 +131,7 @@ function select(change: ChangeEvent): GraphNode[] {
 }
 
 function users(id: string): number {
-  return state.graph.edges.filter((e) => e.target === id && (e.type === 'RUNS_ON' || e.type === 'READS')).length
+  return state.graph.edges.filter((e) => e.target === id && (e.type === 'RUNS_ON' || e.type === 'READS')).filter((e) => state.graph.nodes.find((n) => n.id === e.source)?.type === 'agent').length
 }
 
 function readbackFor(change: ChangeEvent, matches: GraphNode[]): string {

@@ -1,19 +1,54 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 
-export function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+export type MotionPref = 'system' | 'on' | 'off'
+
+const KEY = 'radius.motion'
+const listeners = new Set<() => void>()
+
+function systemReduced(): boolean {
+  return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+}
+
+export function getMotionPref(): MotionPref {
+  const v = typeof localStorage !== 'undefined' ? localStorage.getItem(KEY) : null
+  return v === 'on' || v === 'off' ? v : 'system'
+}
+
+/** The reveal runs unless the person (or their system, when they have not chosen) asks for reduced motion. */
+export function motionReduced(pref = getMotionPref()): boolean {
+  return pref === 'off' || (pref === 'system' && systemReduced())
+}
+
+function applyRootClass() {
+  document.documentElement.classList.toggle('reduce-motion', motionReduced())
+}
+
+export function setMotionPref(pref: MotionPref) {
+  localStorage.setItem(KEY, pref)
+  applyRootClass()
+  listeners.forEach((l) => l())
+}
+
+if (typeof window !== 'undefined') {
+  applyRootClass()
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').addEventListener('change', () => {
+    applyRootClass()
+    listeners.forEach((l) => l())
+  })
+}
+
+const subscribe = (l: () => void) => {
+  listeners.add(l)
+  return () => listeners.delete(l)
+}
+
+export function useMotionPref(): { pref: MotionPref; reduced: boolean; systemReduced: boolean } {
+  const pref = useSyncExternalStore(subscribe, getMotionPref, () => 'system' as MotionPref)
+  return { pref, reduced: motionReduced(pref), systemReduced: systemReduced() }
 }
 
 export function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(prefersReducedMotion)
-  useEffect(() => {
-    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)')
-    if (!mq) return
-    const on = () => setReduced(mq.matches)
-    mq.addEventListener('change', on)
-    return () => mq.removeEventListener('change', on)
-  }, [])
-  return reduced
+  return useMotionPref().reduced
 }
 
 /** Page 25: counters ease out with 1-(1-t)^3 so the last digits settle instead of snapping. */

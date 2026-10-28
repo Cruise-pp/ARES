@@ -4,16 +4,15 @@ import { api } from '../api/client'
 import { useAsync, useGraph } from '../api/hooks'
 import type { Run } from '../api/types'
 import { actAt, RadiusGraph, REVEAL, type NodeTone } from '../components/RadiusGraph'
-import { Freshness } from '../components/Shell'
-import { formatNumber, nodeLabel, plural, splitTitle } from '../lib/format'
+import { nodeLabel, plural, splitTitle } from '../lib/format'
 import { radialLayout } from '../lib/layout'
 import { resumeLog } from '../lib/local'
-import { useCountUp, useReducedMotion } from '../lib/motion'
+import { setMotionPref, useCountUp, useMotionPref } from '../lib/motion'
 import { ACTION_HOPS, countVisible, MAX_HOPS, pathSteps, workflowRows, type WorkflowRow, type WorkflowStatus } from '../lib/reach'
 
 type Phase = 'rest' | 'firing' | 'rings' | 'acting' | 'settled'
 
-function useElapsedReadout(epoch: number | null, animate: boolean, elapsedMs: number) {
+export function useElapsedReadout(epoch: number | null, animate: boolean, elapsedMs: number) {
   const [ms, setMs] = useState(animate ? 0 : elapsedMs)
   useEffect(() => {
     if (!animate || epoch === null) {
@@ -34,16 +33,16 @@ function useElapsedReadout(epoch: number | null, animate: boolean, elapsedMs: nu
 }
 
 const GROUPS_LIVE: { status: WorkflowStatus; title: string; tone: string }[] = [
-  { status: 'paused', title: 'Paused automatically', tone: 'red' },
+  { status: 'paused', title: 'Paused', tone: 'red' },
+  { status: 'warned', title: 'Warned · still running', tone: 'amber' },
   { status: 'resumed', title: 'Resumed by hand', tone: 'grey' },
-  { status: 'warned', title: 'Runs, with a warning', tone: 'amber' },
-  { status: 'beyond', title: `Beyond ${ACTION_HOPS} hops · shown, not acted on`, tone: 'grey' },
+  { status: 'beyond', title: `Beyond ${ACTION_HOPS} hops · not acted on`, tone: 'grey' },
 ]
 
 const GROUPS_PREVIEW: { status: WorkflowStatus; title: string; tone: string }[] = [
   { status: 'would_pause', title: 'Would pause', tone: 'red' },
-  { status: 'would_warn', title: 'Would run, with a warning', tone: 'amber' },
-  { status: 'beyond', title: `Beyond ${ACTION_HOPS} hops · shown, not acted on`, tone: 'grey' },
+  { status: 'would_warn', title: 'Would warn', tone: 'amber' },
+  { status: 'beyond', title: `Beyond ${ACTION_HOPS} hops · not acted on`, tone: 'grey' },
 ]
 
 export function BlastRadius() {
@@ -66,7 +65,7 @@ export function BlastRadius() {
         </div>
         <p>
           <Link to="/" style={{ color: 'var(--blue)' }}>
-            ← Changes
+            ← New change
           </Link>
         </p>
       </main>
@@ -79,12 +78,15 @@ export function BlastRadius() {
       run={run}
       focusParam={params.get('focus')}
       setFocusParam={(id) => setParams(id ? { focus: id } : {}, { replace: true })}
-      onSendSteps={() => navigate(`/runs/${encodeURIComponent(run.run_id)}/incident`)}
+      onDrill={(wfId) => navigate(`/runs/${encodeURIComponent(run.run_id)}/workflows/${encodeURIComponent(wfId)}`)}
       onFireLive={async () => {
         const live = await api.postChange(run.change, 'live')
         navigate(`/runs/${encodeURIComponent(live.run_id)}`)
       }}
-      onResumed={refresh}
+      onResumed={async () => {
+        refresh()
+        runState.reload()
+      }}
       graphNodes={nodes}
       graph={graph}
     />
@@ -97,13 +99,13 @@ interface ViewProps {
   graphNodes: ReturnType<typeof useGraph>['nodes']
   focusParam: string | null
   setFocusParam: (id: string | null) => void
-  onSendSteps: () => void
+  onDrill: (workflowId: string) => void
   onFireLive: () => Promise<void>
   onResumed: () => void
 }
 
-function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, onSendSteps, onFireLive, onResumed }: ViewProps) {
-  const reduced = useReducedMotion()
+function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, onDrill, onFireLive, onResumed }: ViewProps) {
+  const { pref, reduced, systemReduced } = useMotionPref()
   const [limit, setLimit] = useState(ACTION_HOPS)
   const [play, setPlay] = useState(0)
   const [phase, setPhase] = useState<Phase>('rest')
@@ -115,9 +117,11 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
   const preview = run.mode === 'preview'
   const [title, subject] = splitTitle(run.change.title ?? run.run_id)
 
+  // The platform view shows agents, not their sub-agents; those open one level down, per workflow.
+  const reached = useMemo(() => run.reached.filter((r) => r.type !== 'subagent'), [run.reached])
   const layout = useMemo(
-    () => radialLayout(run.reached, graphNodes, graph.edges, { rootLabel: title }),
-    [run.reached, graphNodes, graph.edges, title],
+    () => radialLayout(reached, graphNodes, graph.edges, { rootLabel: title }),
+    [reached, graphNodes, graph.edges, title],
   )
   const maxRing = Math.max(...layout.nodes.filter((n) => !n.ghost).map((n) => n.ring))
   const act = actAt(maxRing)
@@ -140,11 +144,11 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
 
   const animate = !reduced && phase !== 'settled'
   const rows = workflowRows(run, graph, limit)
-  const counts = countVisible(run.reached, run.verdicts, Math.min(limit, MAX_HOPS))
+  const counts = countVisible(reached, run.verdicts, Math.min(limit, MAX_HOPS))
   const statusOf = new Map(rows.map((r) => [r.id, r.status]))
 
   const tones = new Map<string, NodeTone>()
-  for (const r of run.reached) {
+  for (const r of reached) {
     if (r.hops === 0 && !layout.multiStart) tones.set(r.id, 'start')
     else if (r.type === 'agent' || r.type === 'tool' || r.type === 'data') tones.set(r.id, 'agent')
     else if (r.type === 'workflow') {
@@ -154,30 +158,28 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
   }
 
   const flashIds = useMemo(
-    () => new Set(preview ? [] : run.verdicts.filter((v) => v.action === 'paused').map((v) => v.workflow_id)),
-    [run.verdicts, preview],
+    () => new Set(preview ? [] : rows.filter((r) => r.status === 'paused').map((r) => r.id)),
+    [rows.map((r) => r.status).join(), preview],
   )
 
-  const focusItem = focusParam ? run.reached.find((r) => r.id === focusParam) : undefined
+  const focusItem = focusParam ? reached.find((r) => r.id === focusParam) : undefined
   const focusSet = focusItem ? new Set(focusItem.path) : null
   if (focusSet && layout.multiStart) focusSet.add('__change')
 
   const elapsed = useElapsedReadout(epoch, animate, run.elapsed_ms)
   const cAgents = useCountUp(counts.agents, epoch, act, REVEAL.countersMs, animate)
   const cWorkflows = useCountUp(counts.workflows, epoch, act, REVEAL.countersMs, animate)
-  const cPaused = useCountUp(preview ? rows.filter((r) => r.status === 'would_pause').length : counts.paused, epoch, act, REVEAL.countersMs, animate)
-  const cDuties = useCountUp(counts.duties, epoch, act, REVEAL.countersMs, animate)
+  const pausedN = preview ? rows.filter((r) => r.status === 'would_pause').length : counts.paused
+  const warnedN = preview ? rows.filter((r) => r.status === 'would_warn').length : counts.warned
+  const cPaused = useCountUp(pausedN, epoch, act, REVEAL.countersMs, animate)
+  const cWarned = useCountUp(warnedN, epoch, act, REVEAL.countersMs, animate)
   const acted = !animate || phase === 'acting'
   const anyHigh = run.verdicts.some((v) => v.risk === 'high')
 
-  const duties = run.reached.filter((r) => r.type === 'obligation' && r.hops <= Math.min(limit, ACTION_HOPS))
+  const duties = reached.filter((r) => r.type === 'obligation' && r.hops <= Math.min(limit, ACTION_HOPS))
   const pausedRows = rows.filter((r) => r.status === 'paused')
-  const heldItems = run.reached
-    .filter((r) => r.type === 'output' && r.hops <= limit && pausedRows.some((p) => r.path[r.path.length - 2] === p.id))
-    .reduce((s, r) => s + (Number(graphNodes.get(r.id)?.volume) || 0), 0)
 
   const groups = preview ? GROUPS_PREVIEW : GROUPS_LIVE
-  const byOwner = rows.length > 6
   const rowsStart = Math.max(REVEAL.rowsStart, act + 200)
   let rowIndex = 0
   const rowIn = (i: number) =>
@@ -190,17 +192,16 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
         key={r.id}
         className={`wf-item ${r.status} ${focusParam === r.id ? 'on' : ''} ${a.className}`}
         style={a.style}
-        onClick={() => setFocusParam(focusParam === r.id ? null : r.id)}
+        onClick={() => onDrill(r.id)}
+        onMouseEnter={() => setFocusParam(r.id)}
+        onMouseLeave={() => setFocusParam(null)}
+        title="Open this workflow"
       >
         <div className="name">
           <span>{r.name}</span>
-          <span className="faint" style={{ fontWeight: 400, fontSize: 11 }}>
-            {plural(r.hops, 'hop')}
-          </span>
+          <span className="chev">›</span>
         </div>
-        <div className="detail">
-          {byOwner ? r.detail : `${r.owner} · ${r.detail}`}
-        </div>
+        <div className="detail">{r.owner}</div>
       </button>
     )
   }
@@ -224,40 +225,55 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
     }
   }
 
+  const skipped = reduced && pref === 'system' && systemReduced
+
   return (
     <>
       <div className="br-head">
         <Link to="/" className="back">
-          ← Changes
+          ← New change
         </Link>
         <span className="cid">{title}</span>
         {subject && <span className="subject">{subject}</span>}
         {preview ? (
           <span className="badge preview">PREVIEW · NOTHING PAUSES</span>
         ) : (
-          <span className={`badge ${anyHigh ? 'high' : 'warned'}`} style={{ minWidth: 60 }}>
-            {anyHigh ? 'HIGH' : 'LOW'}
-          </span>
+          <span className={`badge ${anyHigh ? 'high' : 'warned'}`}>{anyHigh ? 'HIGH' : 'LOW'}</span>
         )}
         <div className="right">
-          <div>
-            found in <strong>{(elapsed / 1000).toFixed(1)}s</strong>
-          </div>
-          <Freshness />
+          found in <strong>{(elapsed / 1000).toFixed(1)}s</strong>
         </div>
       </div>
 
       <div className="br">
         <section className="br-stage">
-          {acted && counts.paused > 0 && !preview && <div className="paused-pill">{counts.paused} PAUSED</div>}
+          {acted && pausedN > 0 && !preview && <div className="paused-pill">{pausedN} PAUSED</div>}
           {preview && <div className="paused-pill preview-pill">NOTHING PAUSES</div>}
-          <button className="btn ghost small replay" onClick={() => setPlay((p) => p + 1)} title="Replay the reveal">
-            ↻ Replay
-          </button>
+
+          {skipped ? (
+            <div className="motion-banner">
+              Your system asks for less motion, so the reveal was skipped.
+              <button
+                className="motion-play"
+                onClick={() => {
+                  setMotionPref('on')
+                  setPlay((p) => p + 1)
+                }}
+              >
+                ▶ Play the reveal
+              </button>
+            </div>
+          ) : (
+            !animate && (
+              <button className="btn ghost small replay" onClick={() => setPlay((p) => p + 1)} title="Replay the reveal">
+                ↻ Replay
+              </button>
+            )
+          )}
 
           {focusItem && (
             <div className="path-strip" role="status">
-              {pathSteps(focusItem, run.reached, graphNodes).map((s, i) => (
+              {pathSteps(focusItem, reached, graphNodes).map((s, i) => (
                 <span key={s.id} style={{ display: 'contents' }}>
                   {i > 0 && <span className="verb">{s.verb} →</span>}
                   <span className="step">{s.label}</span>
@@ -273,7 +289,7 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
           )}
 
           <RadiusGraph
-            key={`${run.run_id}-${play}`}
+            key={`${run.run_id}-${play}-${reduced}`}
             layout={layout}
             tones={tones}
             limit={limit}
@@ -281,12 +297,15 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
             animate={animate}
             flashIds={flashIds}
             focus={focusSet}
-            onSelect={(id) => setFocusParam(id)}
+            onSelect={(id) => {
+              if (id && graphNodes.get(id)?.type === 'workflow') onDrill(id)
+              else setFocusParam(id)
+            }}
           />
 
           <div className="overlay">
             <label className="hop-control">
-              Hop limit <strong>{limit}</strong>
+              Hops <strong>{limit}</strong>
               <input
                 type="range"
                 min={1}
@@ -296,7 +315,7 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
                 aria-label="Hop limit"
               />
             </label>
-            <span className="readout">{(elapsed / 1000).toFixed(1)}s</span>
+            <span className="faint">Tap a workflow to open it</span>
           </div>
         </section>
 
@@ -314,9 +333,9 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
               <div className="n">{cPaused}</div>
               <div className="l">{preview ? 'Would pause' : 'Paused'}</div>
             </div>
-            <div className="counter blue">
-              <div className="n">{cDuties}</div>
-              <div className="l">{counts.duties === 1 ? 'Duty' : 'Duties'}</div>
+            <div className="counter amber">
+              <div className="n">{cWarned}</div>
+              <div className="l">{preview ? 'Would warn' : 'Warned'}</div>
             </div>
           </div>
 
@@ -331,59 +350,42 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
               .filter((r) => r.status === g.status)
               .sort((a, b) => (a.risk === b.risk ? a.name.localeCompare(b.name) : a.risk === 'high' ? -1 : 1))
             if (!list.length) return null
-            const owners = [...new Set(list.map((r) => r.owner))].sort()
             const t = rowIn(rowIndex)
             return (
               <section key={g.status}>
                 <div className={`group-title ${g.tone} ${t.className}`} style={t.style}>
                   {g.title}
-                  {byOwner && ` · ${list.length}`}
                 </div>
-                {byOwner
-                  ? owners.map((o) => (
-                      <div key={o} className="owner-group">
-                        <div className="owner-label">{o}</div>
-                        {list.filter((r) => r.owner === o).map(renderRow)}
-                      </div>
-                    ))
-                  : list.map(renderRow)}
+                {list.map(renderRow)}
               </section>
             )
           })}
 
           <div className={`side-foot ${rowIn(rows.length + 1).className}`} style={rowIn(rows.length + 1).style}>
-            <div className="duty-line">
-              {duties.length > 0 ? (
-                <>
-                  {plural(duties.length, 'obligation')} at risk ·{' '}
-                  <span style={{ color: 'var(--blue)' }}>{duties.map((d) => nodeLabel(graphNodes.get(d.id), d.name)).join(' · ')}</span>
-                </>
-              ) : (
-                'No obligation at risk'
-              )}
-              {heldItems > 0 && <> · {formatNumber(heldItems)} items held</>}
-            </div>
+            {duties.length > 0 && (
+              <div className="duty-line">
+                At risk: <span style={{ color: 'var(--blue)' }}>{duties.map((d) => nodeLabel(graphNodes.get(d.id), d.name)).join(' · ')}</span>
+              </div>
+            )}
 
             {error && <div className="error-box">{error}</div>}
 
             {preview ? (
-              <div className="buttons">
-                <button
-                  className="btn primary"
-                  disabled={busy}
-                  onClick={async () => {
-                    setBusy(true)
-                    try {
-                      await onFireLive()
-                    } catch (e) {
-                      setError((e as Error).message)
-                      setBusy(false)
-                    }
-                  }}
-                >
-                  Fire it live
-                </button>
-              </div>
+              <button
+                className="btn primary"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true)
+                  try {
+                    await onFireLive()
+                  } catch (e) {
+                    setError((e as Error).message)
+                    setBusy(false)
+                  }
+                }}
+              >
+                Fire it live
+              </button>
             ) : resumeOpen ? (
               <form
                 className="resume-form"
@@ -407,13 +409,15 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, on
                 </button>
               </form>
             ) : (
-              <div className="buttons">
-                <button className="btn primary" onClick={onSendSteps} disabled={run.tasks.length === 0}>
-                  Send next steps ({run.tasks.length})
-                </button>
-                <button className="btn quiet" onClick={() => setResumeOpen(true)} disabled={pausedRows.length === 0}>
-                  Resume… (reason)
-                </button>
+              <div className="quiet-links">
+                {run.tasks.length > 0 && (
+                  <Link to={`/runs/${encodeURIComponent(run.run_id)}/incident`}>Owners & next steps ({run.tasks.length}) →</Link>
+                )}
+                {pausedRows.length > 0 && (
+                  <button className="linkish" onClick={() => setResumeOpen(true)}>
+                    Resume…
+                  </button>
+                )}
               </div>
             )}
           </div>
