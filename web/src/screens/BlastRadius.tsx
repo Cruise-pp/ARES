@@ -4,7 +4,7 @@ import { api, runCache } from '../api/client'
 import { useAsync, useGraph } from '../api/hooks'
 import type { Run } from '../api/types'
 import { actAt, RadiusGraph, REVEAL, type NodeTone } from '../components/RadiusGraph'
-import { nodeLabel, plural, splitTitle } from '../lib/format'
+import { formatElapsed, nodeLabel, plural, splitTitle } from '../lib/format'
 import { radialLayout } from '../lib/layout'
 import { resumeLog } from '../lib/local'
 import { storySentence } from '../lib/story'
@@ -26,7 +26,7 @@ export function useElapsedReadout(epoch: number | null, animate: boolean, elapse
       setMs(0)
       return
     }
-    const window = Math.min(elapsedMs, REVEAL.readoutEnd - REVEAL.readoutStart)
+    const window = Math.max(1, Math.min(elapsedMs, REVEAL.readoutEnd - REVEAL.readoutStart))
     const t = setInterval(() => {
       const p = (performance.now() - epoch - REVEAL.readoutStart) / window
       if (p >= 1) {
@@ -311,7 +311,7 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, en
         {preview && <span className="subject">Preview · nothing pauses</span>}
         <div className="right">
           <span className={`when${animate ? ' hidden' : ''}`}>
-            found in <strong>{(run.elapsed_ms / 1000).toFixed(1)}s</strong>
+            found in <strong>{formatElapsed(run.elapsed_ms)}</strong>
           </span>
         </div>
       </div>
@@ -322,7 +322,7 @@ function BlastRadiusView({ run, graph, graphNodes, focusParam, setFocusParam, en
           {animate && !waiting && acted && !preview && pausedN > 0 && <div className="vignette act-pulse" />}
           {animate && !waiting && (
             <div className={`tracer${acted ? ' done' : ''}`} style={acted ? { animationDelay: '500ms' } : undefined}>
-              <div className="t">{(elapsed / 1000).toFixed(1)}s</div>
+              <div className="t">{formatElapsed(elapsed)}</div>
               <div className="l">{acted ? 'found' : 'tracing the graph'}</div>
             </div>
           )}

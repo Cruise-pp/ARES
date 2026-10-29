@@ -42,7 +42,7 @@ def fire_s1(api):
 
 def test_graph(api):
     g = api.get("/graph").json()
-    assert len(g["nodes"]) == 238 and g["edges"][0].keys() == {"from", "to", "type"}
+    assert len(g["nodes"]) == 45 and g["edges"][0].keys() == {"from", "to", "type"}
     assert {"synced_at", "coverage"} <= set(g)
 
 

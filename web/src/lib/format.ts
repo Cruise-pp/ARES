@@ -27,6 +27,14 @@ export function formatNumber(n: number): string {
   return n.toLocaleString('en-US')
 }
 
+/** Search time a person can read. A live graph search is a few milliseconds; seconds with one decimal print that as 0.0s. */
+export function formatElapsed(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return '0ms'
+  if (ms < 1000) return `${ms < 10 ? ms.toFixed(1) : String(Math.round(ms))}ms`
+  const seconds = ms / 1000
+  return seconds < 10 ? `${seconds.toFixed(1)}s` : `${Math.round(seconds)}s`
+}
+
 export function nodeLabel(node: GraphNode | undefined, fallback = ''): string {
   if (!node) return fallback
   switch (node.type) {

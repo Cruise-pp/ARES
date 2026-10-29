@@ -40,6 +40,8 @@ class Radius:
         self.store = Store(self.dir / "state.json", clock)
         self.g = Graph(graph_path)
         for nid, fields in self.store.data["overrides"].items():  # graph edits survive a restart
+            if nid not in self.g.nodes:
+                continue
             for field, value in fields.items():
                 self.g.set(nid, field, value)
         self.background = background

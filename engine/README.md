@@ -94,4 +94,4 @@ To map an unmatched change, do the same with a selector that resolves: the run w
    one forced `emit_change` tool call at temperature 0, and the message model sees the incident fields only.
 3. **A change aimed at an obligation or an output** ("SOX 404 changed") walks SERVES/SENDS backward at
    hop 0 only. Without it, that change reaches nothing. S1-S3 do not change.
-4. **Graph size.** 238 nodes, as on page 31; 281 links, not the 611 in the page-11 header.
+4. **Graph size.** 45 nodes and 44 links: the demo paths only, so a blast radius stays readable.

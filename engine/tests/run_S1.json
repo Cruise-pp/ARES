@@ -16,7 +16,7 @@
     "source": {"lane": "words", "raw": "Vendor says pdf-parse 2.1.4 has a remote code bug, CVE-2026-4471. Fixed in 2.1.6."},
     "parse": {"by": "model", "confidence": 0.96, "receipt": "rcpt_88"}
   },
-  "counts": {"agents": 3, "workflows": 3, "paused": 2, "warned": 1, "duties": 1, "outputs": 2, "untouched": 60},
+  "counts": {"agents": 3, "workflows": 3, "paused": 2, "warned": 1, "duties": 1, "outputs": 2, "untouched": 8},
   "reached": [
     {"id": "tl_pdf_parse_214", "type": "tool", "name": "pdf-parse 2.1.4", "hops": 0, "path": ["tl_pdf_parse_214"], "via": null},
     {"id": "ag_claims_reader", "type": "agent", "name": "Claims reader", "hops": 1, "path": ["tl_pdf_parse_214", "ag_claims_reader"], "via": "RUNS_ON"},

@@ -15,21 +15,22 @@ def run(target, *conds, mode="all"):
     return counts(g, reached, verdicts), {v["workflow_id"]: v["action"] for v in verdicts}
 
 
-def test_seed_graph_has_238_nodes_in_the_page_31_shape():
+def test_seed_graph_is_small_enough_to_read_and_still_covers():
     kinds = {t: len(g.of_type(t)) for t in ("tool", "data", "agent", "workflow", "obligation", "output")}
-    assert kinds == {"tool": 42, "data": 12, "agent": 26, "workflow": 63, "obligation": 19, "output": 76}
+    assert kinds == {"tool": 8, "data": 4, "agent": 11, "workflow": 11, "obligation": 2, "output": 9}
+    assert len(g.nodes) == 45 and len(g.edges()) == 44
     assert len(g.unknown_agents()) == 3 and 0.9 < g.coverage() < 1
 
 
 def test_s1_faulty_tool():
     c, v = run("tool", ("name", "eq", "pdf-parse"), ("version", "eq", "2.1.4"))
-    assert c == {"agents": 3, "workflows": 3, "paused": 2, "warned": 1, "duties": 1, "outputs": 2, "untouched": 60}
+    assert c == {"agents": 3, "workflows": 3, "paused": 2, "warned": 1, "duties": 1, "outputs": 2, "untouched": 8}
     assert v == {"wf_customer_reply": "paused", "wf_finance_feed": "paused", "wf_contract_review": "warned"}
 
 
 def test_s2_personal_data():
     c, _ = run("data", ("table", "eq", "customers"), ("column", "eq", "phone"))
-    assert (c["agents"], c["workflows"], c["paused"], c["warned"]) == (5, 7, 2, 5)
+    assert (c["agents"], c["workflows"], c["paused"], c["warned"]) == (2, 2, 1, 1)
 
 
 def test_s3_eu_models_only():
@@ -40,7 +41,7 @@ def test_s3_eu_models_only():
 
 @pytest.mark.parametrize("conds,agents,workflows", [
     ((("model_id", "eq", "gpt-x"),), 2, 2),
-    ((("ecosystem", "eq", "npm"),), 14, 34),
+    ((("ecosystem", "eq", "npm"),), 3, 3),
 ])
 def test_unseen_changes_need_no_new_code(conds, agents, workflows):
     target = "agent" if conds[0][0] == "model_id" else "tool"
@@ -50,7 +51,7 @@ def test_unseen_changes_need_no_new_code(conds, agents, workflows):
 
 def test_a_change_to_an_obligation_reaches_the_workflows_that_serve_it():
     c, _ = run("obligation", ("name", "eq", "SOX 404"))
-    assert c["workflows"] == 5
+    assert c["workflows"] == 2
 
 
 def test_same_input_same_output_in_100_runs_under_10_ms():

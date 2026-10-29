@@ -10,6 +10,7 @@ import { getMotionPref, motionReduced } from '../lib/motion'
 import { storySentence } from '../lib/story'
 import { countVisible, withinHops } from '../lib/reach'
 import { compareLists, listsOf } from '../screens/Policy'
+import { formatElapsed } from '../lib/format'
 
 beforeEach(() => resetMock())
 
@@ -266,6 +267,14 @@ describe('panel sentence', () => {
     )
     expect(storySentence({ preview: true, paused: [], warned: [], resumed: [] })).toBe('If you fire this, nothing pauses.')
     expect(storySentence({ preview: false, paused: [], warned: [], resumed: ['Finance feed'] })).toBe('Finance feed is running again.')
+  })
+})
+
+describe('elapsed readout', () => {
+  it('keeps a millisecond search visible, and still prints a multi-second search in seconds', () => {
+    expect(formatElapsed(8.23)).toBe('8.2ms')
+    expect(formatElapsed(0)).toBe('0ms')
+    expect(formatElapsed(3800)).toBe('3.8s')
   })
 })
 
