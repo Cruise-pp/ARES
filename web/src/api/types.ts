@@ -1,7 +1,6 @@
-// Contract types, typed from brief page 31d (and 07b for ChangeEvent, 21 for nodes).
-// If this file and page 31d disagree, page 31d wins.
+// Contract types. The engine is the source of truth (engine/radius/api.py, core.py, pipeline.py).
+// 'subagent' and 'DELEGATES' are not in the engine graph. Screens skip them when a graph has none.
 
-// 'subagent' and 'DELEGATES' are a proposed additive change (page 31d-v2), pending the human's approval.
 export type NodeType = 'tool' | 'data' | 'agent' | 'subagent' | 'workflow' | 'obligation' | 'output'
 export type EdgeType = 'RUNS_ON' | 'READS' | 'INVOKES' | 'DELEGATES' | 'SERVES' | 'SENDS'
 
@@ -35,7 +34,7 @@ export interface ChangeEvent {
   effect: Effect
   mode?: RunMode
   source?: { lane: 'feed' | 'paste' | 'words'; raw: string }
-  parse?: { by: 'model' | 'code'; confidence?: number; receipt?: string }
+  parse?: { by: 'model' | 'code' | 'person'; confidence?: number | null; receipt?: string }
 }
 
 export interface GraphNode {
@@ -64,17 +63,28 @@ export interface GraphNode {
   [extra: string]: unknown
 }
 
+/** GET /graph returns `{from, to, type}`. normalizeGraph maps that onto source/target. */
 export interface GraphEdge {
   source: string
   target: string
   type: EdgeType
 }
 
+export interface Owner {
+  id: string
+  team: string
+  person: string
+  channel?: string
+}
+
 export interface Graph {
   nodes: GraphNode[]
   edges: GraphEdge[]
   synced_at: string
+  /** Fraction of nodes complete, as GET /graph returns it. 0.94 means 94%. */
   coverage: number
+  owners: Owner[]
+  unknown_agents: string[]
 }
 
 export type MatchState = 'exact' | 'ambiguous' | 'none'
@@ -112,7 +122,8 @@ export interface Reached {
   name: string
   hops: number
   path: string[]
-  via: EdgeType[]
+  /** The one edge that reached this node. Null on a start node. */
+  via: EdgeType | null
 }
 
 export interface Verdict {
@@ -136,12 +147,16 @@ export interface Run {
 export interface Incident {
   id: string
   cause: string
-  path: string | string[]
+  path: string
   risk: string
   duty: string
   action: string
   owner: string
   next: string
+  workflow_id?: string
+  change_id?: string
+  run_id?: string
+  state?: string
 }
 
 export type TaskState = 'open' | 'accepted' | 'closed'
@@ -164,9 +179,27 @@ export interface FeedRow {
   change_id: string
   title: string
   kind: Kind | string
-  reach: string | { agents: number; workflows: number }
+  /** Engine text, for example "3 agents · 3 workflows". */
+  reach: string
   state: string
   at: string
-  // Not on page 31d. Without it a feed row cannot open its run; reported to the human as a contract gap.
+  /**
+   * Not a field of GET /changes. The client fills it from a fired GET /record event,
+   * or from the run this browser just posted.
+   */
   run_id?: string
+}
+
+/** One line of GET /record. Append-only: fired, paused, warned, resumed, closed, dispatched. */
+export interface RecordEvent {
+  at: string
+  event: string
+  change_id?: string
+  run_id?: string
+  workflow_id?: string
+  incident_id?: string
+  task_id?: string
+  reason?: string
+  title?: string
+  by?: string
 }

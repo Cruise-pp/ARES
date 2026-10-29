@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { api, API_MODE } from '../api/client'
+import { api, ApiError, API_MODE } from '../api/client'
 import { useGraph } from '../api/hooks'
 import type { ChangeEvent, ParsedChange, RunMode } from '../api/types'
 import { pinCandidate, ReadCard } from '../components/ReadCard'
@@ -9,11 +9,23 @@ import { abort, launch } from '../lib/handoff'
 import { unmatchedQueue } from '../lib/local'
 import { useReducedMotion } from '../lib/motion'
 
-const SAMPLES = [
-  'pdf-parse 2.1.4 has a CVE. Fixed in 2.1.6.',
-  'pdf-parse 2.1 has a CVE',
-  'customers.phone is now PII',
-  'Every tool from Acme is breached.',
+const SAMPLES: { label: string; text: string }[] = [
+  {
+    label: 'pdf-parse 2.1.4',
+    text: 'tool: pdf-parse\nversion: 2.1.4\necosystem: npm\ncve: CVE-2026-4471\nfixed: 2.1.6',
+  },
+  {
+    label: 'pdf-parse 2.1, pick one',
+    text: 'tool: pdf-parse\nversion: 2.1\ncve: CVE-2026-4471',
+  },
+  {
+    label: 'customers.phone is PII',
+    text: 'table: customers\ncolumn: phone\nclassification: PII',
+  },
+  {
+    label: 'a sentence',
+    text: 'Vendor says pdf-parse 2.1.4 has a remote code bug, CVE-2026-4471. Fixed in 2.1.6.',
+  },
 ]
 
 const PARSE_DEBOUNCE_MS = 450
@@ -69,6 +81,16 @@ export function Home() {
   useEffect(() => {
     const raw = text.trim()
     setSaved(false)
+    // Live: each parse is stored. Read on Enter or a sample, not on every pause in typing.
+    if (API_MODE === 'live') {
+      if (raw.length < 4) {
+        seq.current++
+        setParsed(null)
+        setParsedFor(null)
+        setReading(false)
+      }
+      return
+    }
     if (raw.length < 4) {
       seq.current++
       setParsed(null)
@@ -100,7 +122,14 @@ export function Home() {
       navigate(`/runs/${encodeURIComponent(run.run_id)}`, { state: { fresh: true } })
     } catch (e) {
       abort()
-      setError((e as Error).message)
+      const body = e instanceof ApiError ? e.body : undefined
+      if (e instanceof ApiError && e.status === 409 && body && typeof body === 'object' && 'state' in body && 'change' in body) {
+        setParsed(body as ParsedChange)
+        setParsedFor(text.trim())
+        setError(null)
+      } else {
+        setError((e as Error).message)
+      }
       setBusy(false)
       setLeaving(false)
     }
@@ -121,7 +150,9 @@ export function Home() {
     ? 'Reading…'
     : parsed?.state === 'exact' && fresh
       ? '⏎ to fire · nothing changes until you do'
-      : 'Plain words, a pasted advisory, or JSON'
+      : API_MODE === 'live'
+        ? '⏎ to read · plain words, a pasted advisory, or JSON'
+        : 'Plain words, a pasted advisory, or JSON'
 
   return (
     <main className={`home${leaving ? ' leaving' : ''}${parsed ? ' has-card' : ''}`}>
@@ -139,11 +170,17 @@ export function Home() {
         />
         <div className={`home-hint${reading ? ' reading' : ''}`}>{hint}</div>
 
-        {API_MODE === 'mock' && !text && (
+        {!text && (
           <div className="home-samples">
             {SAMPLES.map((s) => (
-              <button key={s} onClick={() => setText(s)}>
-                {s}
+              <button
+                key={s.label}
+                onClick={() => {
+                  setText(s.text)
+                  read(s.text)
+                }}
+              >
+                {s.label}
               </button>
             ))}
           </div>

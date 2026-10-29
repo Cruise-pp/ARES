@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useGraph } from '../api/hooks'
 import type { GraphNode, NodeType } from '../api/types'
-import { nodeLabel, ownerName, TYPE_PLURAL } from '../lib/format'
+import { nodeLabel, ownerLine, TYPE_PLURAL } from '../lib/format'
 
 const COLUMNS: NodeType[] = ['tool', 'data', 'agent', 'workflow', 'obligation', 'output']
 const COL_W = 190
@@ -103,7 +103,7 @@ export function GraphView() {
         <div style={{ marginLeft: 'auto', fontSize: 12, maxWidth: 380, textAlign: 'right' }}>
           {sel ? (
             <>
-              <b>{nodeLabel(sel)}</b> <span className="muted">· {sel.type} · {ownerName(sel.owner_id)}</span>
+              <b>{nodeLabel(sel)}</b> <span className="muted">· {sel.type} · {ownerLine(graph.owners, sel.owner_id)}</span>
               {sel.type === 'workflow' && (
                 <>
                   {' '}

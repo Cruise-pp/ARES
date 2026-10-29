@@ -4,11 +4,11 @@ import { api } from '../api/client'
 import { useAsync, useGraph } from '../api/hooks'
 import { motionReduced } from '../lib/motion'
 import type { Incident, TaskWithIncident } from '../api/types'
-import { ownerName, plural } from '../lib/format'
+import { ownerLine, plural } from '../lib/format'
 import { nextOf } from './TaskMessage'
 
 export function pathText(path: Incident['path']): string {
-  return Array.isArray(path) ? path.join(' → ') : path
+  return path
 }
 
 function openedAt(incident: Incident): string {
@@ -42,7 +42,7 @@ export function SevenLines({ incident }: { incident: Incident }) {
 export function IncidentScreen() {
   const { runId = '' } = useParams()
   const [params, setParams] = useSearchParams()
-  const { nodes, refresh } = useGraph()
+  const { nodes, graph, refresh } = useGraph()
   const runState = useAsync(() => api.getRun(runId), [runId])
   const run = runState.data
   const [items, setItems] = useState<TaskWithIncident[] | null>(null)
@@ -194,7 +194,7 @@ export function IncidentScreen() {
                 onClick={() => i.incident && setParams({ task: i.task.id }, { replace: true })}
               >
                 <div className="top">
-                  <span className="owner">{ownerName(i.task.owner_id)}</span>
+                  <span className="owner">{ownerLine(graph?.owners, i.task.owner_id)}</span>
                   <span className={`badge ${state === 'open' ? 'open' : state}`} style={{ minWidth: 64 }}>
                     {closing ? '✓ Done' : STATE_WORD[state]}
                   </span>

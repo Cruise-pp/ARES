@@ -5,7 +5,7 @@
   "change": {
     "id": "chg_0142",
     "kind": "faulty_tool",
-    "title": "CVE-2026-4471 · pdf-parse 2.1.4",
+    "title": "CVE-2026-4471 \u00b7 pdf-parse 2.1.4",
     "target": "tool",
     "where": {
       "all": [
@@ -29,7 +29,7 @@
     "mode": "live",
     "source": {
       "lane": "feed",
-      "raw": "CVE-2026-4471 · pdf-parse 2.1.4 · fixed in 2.1.6"
+      "raw": "CVE-2026-4471 \u00b7 pdf-parse 2.1.4 \u00b7 fixed in 2.1.6"
     },
     "parse": {
       "by": "code",
@@ -55,7 +55,7 @@
       "path": [
         "tl_pdf_parse_214"
       ],
-      "via": []
+      "via": null
     },
     {
       "id": "ag_claims_reader",
@@ -66,9 +66,7 @@
         "tl_pdf_parse_214",
         "ag_claims_reader"
       ],
-      "via": [
-        "RUNS_ON"
-      ]
+      "via": "RUNS_ON"
     },
     {
       "id": "ag_contract_summariser",
@@ -79,9 +77,7 @@
         "tl_pdf_parse_214",
         "ag_contract_summariser"
       ],
-      "via": [
-        "RUNS_ON"
-      ]
+      "via": "RUNS_ON"
     },
     {
       "id": "ag_invoice_extractor",
@@ -92,9 +88,7 @@
         "tl_pdf_parse_214",
         "ag_invoice_extractor"
       ],
-      "via": [
-        "RUNS_ON"
-      ]
+      "via": "RUNS_ON"
     },
     {
       "id": "sa_attachment_reader",
@@ -105,9 +99,7 @@
         "tl_pdf_parse_214",
         "sa_attachment_reader"
       ],
-      "via": [
-        "RUNS_ON"
-      ]
+      "via": "RUNS_ON"
     },
     {
       "id": "sa_clause_extractor",
@@ -118,9 +110,7 @@
         "tl_pdf_parse_214",
         "sa_clause_extractor"
       ],
-      "via": [
-        "RUNS_ON"
-      ]
+      "via": "RUNS_ON"
     },
     {
       "id": "sa_line_item_parser",
@@ -131,9 +121,7 @@
         "tl_pdf_parse_214",
         "sa_line_item_parser"
       ],
-      "via": [
-        "RUNS_ON"
-      ]
+      "via": "RUNS_ON"
     },
     {
       "id": "sa_page_splitter",
@@ -144,9 +132,7 @@
         "tl_pdf_parse_214",
         "sa_page_splitter"
       ],
-      "via": [
-        "RUNS_ON"
-      ]
+      "via": "RUNS_ON"
     },
     {
       "id": "wf_customer_reply",
@@ -158,10 +144,7 @@
         "ag_claims_reader",
         "wf_customer_reply"
       ],
-      "via": [
-        "RUNS_ON",
-        "INVOKES"
-      ]
+      "via": "INVOKES"
     },
     {
       "id": "wf_contract_review",
@@ -173,10 +156,7 @@
         "ag_contract_summariser",
         "wf_contract_review"
       ],
-      "via": [
-        "RUNS_ON",
-        "INVOKES"
-      ]
+      "via": "INVOKES"
     },
     {
       "id": "wf_finance_feed",
@@ -188,10 +168,7 @@
         "ag_invoice_extractor",
         "wf_finance_feed"
       ],
-      "via": [
-        "RUNS_ON",
-        "INVOKES"
-      ]
+      "via": "INVOKES"
     },
     {
       "id": "out_customer_replies",
@@ -204,11 +181,7 @@
         "wf_customer_reply",
         "out_customer_replies"
       ],
-      "via": [
-        "RUNS_ON",
-        "INVOKES",
-        "SENDS"
-      ]
+      "via": "SENDS"
     },
     {
       "id": "ob_sox_404",
@@ -221,11 +194,7 @@
         "wf_finance_feed",
         "ob_sox_404"
       ],
-      "via": [
-        "RUNS_ON",
-        "INVOKES",
-        "SERVES"
-      ]
+      "via": "SERVES"
     },
     {
       "id": "out_gl_posting",
@@ -238,11 +207,7 @@
         "wf_finance_feed",
         "out_gl_posting"
       ],
-      "via": [
-        "RUNS_ON",
-        "INVOKES",
-        "SENDS"
-      ]
+      "via": "SENDS"
     }
   ],
   "verdicts": [

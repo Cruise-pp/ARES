@@ -16,8 +16,7 @@ async function loadRecord(): Promise<Entry[]> {
   const rows = await api.getChanges()
   return Promise.all(
     rows.map(async (row) => {
-      const id = row.run_id ?? row.change_id
-      const run = await api.getRun(id).catch(() => null)
+      const run = row.run_id ? await api.getRun(row.run_id).catch(() => null) : null
       const tasks = run ? await Promise.all(run.tasks.map((t) => api.getTask(t).catch(() => null))) : []
       return { row, run, tasks: tasks.filter((t): t is TaskWithIncident => !!t) }
     }),

@@ -9,6 +9,7 @@ import type {
   ParsedChange,
   Run,
   RunMode,
+  RecordEvent,
   Task,
   TaskWithIncident,
   Verdict,
@@ -430,7 +431,7 @@ function addFeedRow(run: Run, at: Date, stateOverride?: string) {
     change_id: run.change.id ?? `chg_${run.run_id}`,
     title: run.change.title ?? 'Untitled change',
     kind: run.change.kind,
-    reach: { agents: run.counts.agents, workflows: run.counts.workflows },
+    reach: `${run.counts.agents} agents · ${run.counts.workflows} workflows`,
     state: stateOverride ?? feedState(run),
     at: at.toISOString(),
     run_id: run.run_id,
@@ -474,7 +475,14 @@ function seedRun(key: string, change: ChangeEvent, mode: RunMode, minutesAgo: nu
 
 export function resetMock() {
   state = {
-    graph: { nodes: clone(MOCK_NODES), edges: clone(MOCK_EDGES), synced_at: new Date(Date.now() - 4 * MIN).toISOString(), coverage: 0.94 },
+    graph: {
+      nodes: clone(MOCK_NODES),
+      edges: clone(MOCK_EDGES),
+      synced_at: new Date(Date.now() - 4 * MIN).toISOString(),
+      coverage: 0.94,
+      owners: Object.keys(OWNER_TEAM).map((id) => ({ id, team: OWNER_TEAM[id], person: OWNER_PEOPLE[id] ?? '' })),
+      unknown_agents: [],
+    },
     runs: new Map(),
     tasks: new Map(),
     incidents: new Map(),
@@ -570,6 +578,20 @@ export const mockServer = {
 
   getChanges(): FeedRow[] {
     return clone(state.feed)
+  },
+
+  getRecord(): RecordEvent[] {
+    const fired: RecordEvent[] = [...state.feed].reverse().flatMap((row) =>
+      row.run_id ? [{ at: row.at, event: 'fired', change_id: row.change_id, run_id: row.run_id, title: row.title }] : [],
+    )
+    const resumed: RecordEvent[] = state.resumeLog.map((r) => ({
+      at: r.at,
+      event: 'resumed',
+      workflow_id: r.workflow_id,
+      reason: r.reason,
+      by: 'person',
+    }))
+    return clone([...fired, ...resumed])
   },
 
   getRun(id: string): Run {

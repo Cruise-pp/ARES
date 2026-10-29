@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAsync, useGraph } from '../api/hooks'
 import type { TaskWithIncident } from '../api/types'
-import { lowerFirst, ownerName } from '../lib/format'
+import { lowerFirst, ownerLine } from '../lib/format'
 
 const NEXT_LINE = /^next:\s*/i
 
@@ -31,7 +31,7 @@ function withStop(s: string): string {
 
 export function TaskMessage() {
   const { taskId = '' } = useParams()
-  const { nodes } = useGraph()
+  const { nodes, graph } = useGraph()
   const state = useAsync(() => api.getTask(taskId), [taskId])
   const [showPath, setShowPath] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -56,7 +56,7 @@ export function TaskMessage() {
   const body = lines(task.message)
   const heading = body[0] ?? `Your ${lowerFirst(wfName)} needs one step.`
   const rest = body.slice(1).filter((l) => !NEXT_LINE.test(l))
-  const path = incident ? (Array.isArray(incident.path) ? incident.path : incident.path.split(' → ')) : []
+  const path = incident ? incident.path.split(' → ') : []
   const pathShown = path.length > 1 && ['tool', 'data', 'rule', 'agent', 'workflow'].includes(path[0]) ? path.slice(1) : path
   const time = incident ? (/(\d{1,2}:\d{2})/.exec(incident.action)?.[1] ?? '') : ''
 
@@ -78,7 +78,7 @@ export function TaskMessage() {
           <div>
             <div style={{ fontWeight: 600 }}>Radius</div>
             <div style={{ color: '#6e6e73' }}>
-              to {ownerName(task.owner_id)}
+              to {ownerLine(graph?.owners, task.owner_id)}
               {time && ` · ${time}`}
             </div>
           </div>

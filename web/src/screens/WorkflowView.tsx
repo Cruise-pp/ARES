@@ -136,7 +136,9 @@ function WorkflowScene({ run, wfId, graph }: { run: Run | null; wfId: string; gr
   const hitAgents = hit.filter((n) => n.type === 'agent')
   const carried = [...new Set(hit.flatMap((n) => carriers(n.id)))]
   const head = !run
-    ? `${wfName} runs ${plural(members.length - subCount, 'agent')} with ${plural(subCount, 'sub-agent')}.`
+    ? subCount
+      ? `${wfName} runs ${plural(members.length - subCount, 'agent')} with ${plural(subCount, 'sub-agent')}.`
+      : `${wfName} runs ${plural(members.length, 'agent')}.`
     : `${wfName} ${STATUS_PHRASE[status ?? 'none'] ?? 'is reached'}${duties.length ? `, and it serves ${joinNames(duties)}` : ''}.`
   const inside =
     run && carried.length
@@ -228,8 +230,8 @@ function WorkflowScene({ run, wfId, graph }: { run: Run | null; wfId: string; gr
               <span>{run ? 'reached inside' : members.length - subCount === 1 ? 'agent' : 'agents'}</span>
             </div>
             <div>
-              <b>{run ? safe.length : subCount}</b>
-              <span>{run ? 'untouched' : 'sub-agents'}</span>
+              <b>{run ? safe.length : subCount || flow.nodes.filter((n) => n.type === 'output' || n.type === 'obligation').length}</b>
+              <span>{run ? 'untouched' : subCount ? 'sub-agents' : 'outputs and duties'}</span>
             </div>
           </div>
 
@@ -247,7 +249,7 @@ function WorkflowScene({ run, wfId, graph }: { run: Run | null; wfId: string; gr
                   >
                     <span className="p-name">{n.label}</span>
                     <span className="p-next">
-                      {via.length ? `Uses ${via.join(', ')}` : `Reached through its sub-agents`}
+                      {via.length ? `Uses ${via.join(', ')}` : subCount ? 'Reached through its sub-agents' : 'No tool or column recorded'}
                     </span>
                     <span className="chev">›</span>
                   </button>

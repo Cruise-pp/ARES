@@ -38,7 +38,9 @@ make demo          # page 31, beat by beat, in the terminal (resets var/)
 make reset         # empty var/ + yesterday's two changes in the feed (restart the server after)
 make serve         # the API on :8000
 
-export OPENAI_API_KEY=sk-...   # turns on the two model calls: prose in, owner message out
+# turns on the two model calls: prose in, owner message out
+# either export it, or put OPENAI_API_KEY=... in engine/.env (the server reads that file)
+export OPENAI_API_KEY=sk-...
 make test-live                 # the 4 prose samples through the model
 .venv/bin/python demo.py "OpenAI says gpt-4.1 retires on Friday."
 ```

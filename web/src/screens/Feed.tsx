@@ -7,8 +7,8 @@ import { Freshness } from '../components/Shell'
 import { kindLabel, plural, reachText, rowTone, splitTitle, timeAgo } from '../lib/format'
 import { clearLocal, unmatchedQueue, type UnmatchedItem } from '../lib/local'
 
-export function runLink(row: FeedRow): string {
-  return `/runs/${encodeURIComponent(row.run_id ?? row.change_id)}`
+export function runLink(row: FeedRow): string | null {
+  return row.run_id ? `/runs/${encodeURIComponent(row.run_id)}` : null
 }
 
 export function Feed() {
@@ -72,14 +72,15 @@ export function Feed() {
           {rows.map((row) => {
             const tone = rowTone(row.state)
             const [main, sub] = splitTitle(row.title)
+            const href = runLink(row)
             return (
               <div
                 key={`${row.change_id}-${row.at}`}
                 className={`feed-row ${tone}`}
-                role="link"
-                tabIndex={0}
-                onClick={() => navigate(runLink(row))}
-                onKeyDown={(e) => e.key === 'Enter' && navigate(runLink(row))}
+                role={href ? 'link' : undefined}
+                tabIndex={href ? 0 : undefined}
+                onClick={() => href && navigate(href)}
+                onKeyDown={(e) => href && e.key === 'Enter' && navigate(href)}
               >
                 <span className={`dot ${tone}`} />
                 <span>

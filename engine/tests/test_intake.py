@@ -20,6 +20,15 @@ CODE = [k for k, v in EXPECTED.items() if v["adapter"] != "prose"]
 PROSE = [k for k, v in EXPECTED.items() if v["adapter"] == "prose"]
 
 
+def test_env_file_is_read_and_does_not_override(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "already-set")
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+    (tmp_path / ".env").write_text('OPENAI_API_KEY="sk-from-file"\nexport OPENAI_MODEL="gpt-test"\n')
+    llm.load_env(tmp_path / ".env")
+    assert os.environ["OPENAI_API_KEY"] == "already-set"
+    assert os.environ["OPENAI_MODEL"] == "gpt-test"
+
+
 def check(change, card, e):
     assert change["target"] == e["target"]
     assert [[c["field"], c["op"], c["value"]] for c in conds(change)] == e["conds"]

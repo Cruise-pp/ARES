@@ -9,9 +9,34 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
 from .core import FIELDS
 
+
+def load_env(path: Path | None = None) -> None:
+    """Read engine/.env into the environment. A variable already set in the process wins.
+
+    The file is the place the key lives. Values may be quoted. This never prints them.
+    """
+    path = path or Path(__file__).resolve().parent.parent / ".env"
+    if not path.is_file():
+        return
+    for raw in path.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].strip()
+        key, value = line.split("=", 1)
+        key, value = key.strip(), value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        if key:
+            os.environ.setdefault(key, value)
+
+
+load_env()
 MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
 
 

@@ -1,5 +1,5 @@
 import type { EdgeType, Graph, GraphNode, Reached, Run, Verdict } from '../api/types'
-import { EDGE_VERB, lowerFirst, nodeLabel, ownerName } from './format'
+import { EDGE_VERB, lowerFirst, nodeLabel, ownerLine } from './format'
 
 /** Actions apply at four hops (page 31a, rule 3). Reach beyond is shown as a lower group. */
 export const ACTION_HOPS = 4
@@ -77,7 +77,7 @@ export function workflowRows(run: Run, graph: Graph | null, limit: number): Work
       id: r.id,
       name: node?.name ?? r.name,
       ownerId,
-      owner: ownerName(ownerId),
+      owner: ownerLine(graph?.owners, ownerId),
       hops: r.hops,
       risk: v?.risk ?? null,
       status,
@@ -94,14 +94,23 @@ export interface PathStep {
   verb: string | null
 }
 
+function edgeOf(via: Reached['via'] | EdgeType[] | null | undefined): EdgeType | null {
+  if (via == null) return null
+  if (Array.isArray(via)) return via.length ? via[via.length - 1] : null
+  return via
+}
+
 export function pathSteps(item: Reached, reached: Reached[], nodes: Map<string, GraphNode>): PathStep[] {
-  const names = new Map(reached.map((r) => [r.id, r.name]))
-  return item.path.map((id, i) => ({
-    id,
-    label: nodeLabel(nodes.get(id), names.get(id) ?? id),
-    type: nodes.get(id)?.type ?? reached.find((r) => r.id === id)?.type ?? '',
-    verb: i === 0 ? null : EDGE_VERB[item.via[i - 1] as EdgeType] ?? item.via[i - 1] ?? '→',
-  }))
+  const byId = new Map(reached.map((r) => [r.id, r]))
+  return item.path.map((id, i) => {
+    const via = i === 0 ? null : edgeOf(byId.get(id)?.via)
+    return {
+      id,
+      label: nodeLabel(nodes.get(id), byId.get(id)?.name ?? id),
+      type: nodes.get(id)?.type ?? byId.get(id)?.type ?? '',
+      verb: i === 0 ? null : via ? (EDGE_VERB[via] ?? via) : '→',
+    }
+  })
 }
 
 export function pathSentence(steps: PathStep[]): string {

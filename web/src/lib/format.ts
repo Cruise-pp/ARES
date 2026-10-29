@@ -2,6 +2,18 @@ import type { EdgeType, FeedRow, GraphNode, Kind, NodeType } from '../api/types'
 
 const ACRONYMS = new Set(['ai', 'bi', 'cx', 'hr', 'it', 'kyc', 'qa', 'sre'])
 
+/** "Finance Ops · S. Okonkwo", the same line the engine puts on an incident. */
+export function ownerLine(owners: { id: string; team: string; person: string }[] | undefined, ownerId: string | undefined): string {
+  const owner = owners?.find((o) => o.id === ownerId)
+  if (owner) return `${owner.team} · ${owner.person}`
+  return ownerName(ownerId)
+}
+
+/** GET /graph sends a fraction. A value already above 1 is left as a percent. */
+export function coveragePercent(coverage: number): number {
+  return Math.round(coverage <= 1 ? coverage * 100 : coverage)
+}
+
 export function ownerName(ownerId: string | undefined): string {
   if (!ownerId) return 'No owner'
   return ownerId
@@ -73,8 +85,7 @@ export const EDGE_VERB: Record<EdgeType, string> = {
 }
 
 export function reachText(reach: FeedRow['reach']): string {
-  if (typeof reach === 'string') return reach
-  return `${plural(reach.agents, 'agent')} · ${plural(reach.workflows, 'workflow')}`
+  return reach
 }
 
 /** "CVE-2026-4471 · pdf-parse 2.1.4" -> ["CVE-2026-4471", "pdf-parse 2.1.4"] */

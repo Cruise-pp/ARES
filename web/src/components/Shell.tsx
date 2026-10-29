@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { API_MODE } from '../api/client'
 import { useGraph } from '../api/hooks'
-import { timeAgo } from '../lib/format'
+import { coveragePercent, timeAgo } from '../lib/format'
 import { setMotionPref, useMotionPref, type MotionPref } from '../lib/motion'
 
 const DARK_ROUTES = [/^\/runs\//, /^\/graph/]
@@ -19,7 +19,7 @@ export function Freshness() {
   const ageMin = (Date.now() - Date.parse(graph.synced_at)) / 60_000
   return (
     <span className={`freshness${ageMin > 60 ? ' stale' : ''}`} title={graph.synced_at}>
-      graph synced {timeAgo(graph.synced_at)} · {graph.coverage}% coverage
+      graph synced {timeAgo(graph.synced_at)} · {coveragePercent(graph.coverage)}% coverage
     </span>
   )
 }

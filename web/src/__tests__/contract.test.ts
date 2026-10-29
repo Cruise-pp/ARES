@@ -39,7 +39,7 @@ describe('S1 fixture (page 31d)', () => {
   it('adds sub-agents to reached without moving the counts', () => {
     const subs = run.reached.filter((r) => r.type === 'subagent').map((r) => r.id).sort()
     expect(subs).toEqual(['sa_attachment_reader', 'sa_clause_extractor', 'sa_line_item_parser', 'sa_page_splitter'])
-    expect(run.reached.filter((r) => r.type === 'subagent').every((r) => r.hops === 1 && r.via[0] === 'RUNS_ON')).toBe(true)
+    expect(run.reached.filter((r) => r.type === 'subagent').every((r) => r.hops === 1 && r.via === 'RUNS_ON')).toBe(true)
     const live = mockServer.postChange(mockServer.parseChange('pdf-parse 2.1.4 has a CVE. Fixed in 2.1.6.').change, 'live')
     expect(live.counts).toEqual(run.counts)
   })
@@ -231,7 +231,9 @@ describe('live normalisers', () => {
       coverage: 0.94,
       synced_at: '2026-10-28T08:40:00Z',
     })
-    expect(g.coverage).toBe(94)
+    expect(g.coverage).toBe(0.94)
+    expect(g.owners).toEqual([])
+    expect(g.unknown_agents).toEqual([])
     expect(g.edges).toEqual([
       { source: 'wf_a', target: 'ag_a', type: 'INVOKES' },
       { source: 'wf_a', target: 'ob_a', type: 'SERVES' },

@@ -183,7 +183,7 @@ export function buildReached(graph: Graph, paths: string[][]): Reached[] {
     seen.add(id)
     const node = byId.get(id)
     if (!node) throw new Error(`mock spec names unknown node ${id}`)
-    const via = path.slice(1).map((n, i) => edgeBetween(graph, path[i], n))
+    const via = path.length < 2 ? null : edgeBetween(graph, path[path.length - 2], id)
     out.push({ id, type: node.type, name: nodeLabel(node), hops: path.length - 1, path, via })
   }
   return out.sort((x, y) => x.hops - y.hops || x.id.localeCompare(y.id))
